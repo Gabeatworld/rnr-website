@@ -1,0 +1,174 @@
+<!-- Hero Reveal — stagger animation + text cycling
+     Paste into: Page Settings > Custom Code > Before </body> (AFTER intro code)
+     Independent of intro — can be edited without touching intro logic -->
+
+<script>
+// --- Hero Stagger Reveal ---
+function revealHeroElements() {
+  const heroEls = document.querySelectorAll('[data-animate-hero]');
+  const navLogo = document.querySelector('.nav_logo');
+  const navLinks = document.querySelectorAll('.nav_link:not(.is--middle)');
+  const dynamicWordEl = document.querySelector('.dynamic-word');
+
+  if (!heroEls.length) {
+    document.documentElement.classList.add('hero-ready');
+    document.documentElement.classList.remove('has-intro');
+    if (navLogo) gsap.set(navLogo, { opacity: 1 });
+    if (navLinks.length) gsap.set(navLinks, { opacity: 1 });
+    document.body.removeAttribute('style');
+    document.body.classList.add('page-entering');
+    // Clear filter after transition to fix mix-blend-mode stacking context
+    const pw = document.querySelector('.page-wrapper');
+    if (pw) {
+      setTimeout(() => {
+        pw.style.filter = 'none';
+        if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+      }, 1200);
+    }
+    initHeroText();
+    return;
+  }
+
+  // Group by data-animate-hero value
+  const groups = {};
+  heroEls.forEach(el => {
+    const group = el.getAttribute('data-animate-hero') || '1';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push(el);
+  });
+  const sortedKeys = Object.keys(groups).sort((a, b) => Number(a) - Number(b));
+
+  // Initial hidden states
+  gsap.set(heroEls, { opacity: 0, y: 20, filter: 'blur(4px)' });
+  if (navLogo) gsap.set(navLogo, { opacity: 0, y: -10 });
+  if (navLinks.length) gsap.set(navLinks, { opacity: 0, y: -10 });
+  if (dynamicWordEl) gsap.set(dynamicWordEl, { opacity: 0 });
+
+  const overlay = document.querySelector('.intro-overlay');
+
+  const tl = gsap.timeline({
+    onComplete: () => {
+      document.documentElement.classList.add('hero-ready');
+      document.documentElement.classList.remove('has-intro');
+      gsap.set(heroEls, { clearProps: 'willChange,filter' });
+      document.body.removeAttribute('style');
+      document.body.classList.add('page-entering');
+
+      // After page-entering transition ends, clear the CSS filter on .page-wrapper.
+      // blur(0px) still creates a stacking context that breaks mix-blend-mode: exclusion.
+      const pw = document.querySelector('.page-wrapper');
+      if (pw) {
+        function onEnterDone(e) {
+          if (e.propertyName === 'opacity' || e.propertyName === 'filter') {
+            pw.removeEventListener('transitionend', onEnterDone);
+            pw.style.filter = 'none';
+            if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+          }
+        }
+        pw.addEventListener('transitionend', onEnterDone);
+        // Fallback in case transitionend doesn't fire
+        setTimeout(() => {
+          pw.style.filter = 'none';
+          if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+        }, 1200);
+      }
+    }
+  });
+
+  // Fade overlay out
+  tl.to(overlay, {
+    opacity: 0, duration: 0.5, ease: 'power2.inOut',
+    onComplete: () => { if (overlay) overlay.style.display = 'none'; }
+  });
+
+  // Nav — logo then links
+  if (navLogo) {
+    tl.to(navLogo, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, '>-0.1');
+  }
+  if (navLinks.length) {
+    tl.to(navLinks, {
+      opacity: 1, y: 0, duration: 0.3, ease: 'power2.out', stagger: 0.04
+    }, navLogo ? '>-0.25' : '>-0.1');
+  }
+
+  // Hero groups
+  sortedKeys.forEach((key) => {
+    const els = groups[key];
+
+    if (key === '2' && dynamicWordEl && els[0]) {
+      // Heading: word-by-word reveal, then start text cycling
+      const headingEl = els[0];
+      tl.set(headingEl, { opacity: 1, y: 0, filter: 'blur(0px)' });
+
+      const split = new SplitText(headingEl, { type: 'words' });
+      const staticWords = split.words.filter(w => !dynamicWordEl.contains(w));
+      gsap.set(split.words, { opacity: 0, y: 8, filter: 'blur(3px)' });
+
+      tl.to(staticWords, {
+        opacity: 1, y: 0, filter: 'blur(0px)',
+        duration: 0.4, ease: 'power2.out', stagger: 0.07,
+        onComplete: () => {
+          split.revert();
+          gsap.set(dynamicWordEl, { opacity: 0 });
+          initHeroText();
+        }
+      }, '>');
+    } else {
+      // Standard group reveal
+      tl.to(els, {
+        opacity: 1, y: 0, filter: 'blur(0px)',
+        duration: 0.6, ease: 'power2.out', stagger: 0.02
+      }, '>+0.1');
+    }
+  });
+}
+
+// --- Hero Text Cycling ---
+function initHeroText() {
+  const dynamicWordEl = document.querySelector('.dynamic-word');
+  if (!dynamicWordEl || typeof SplitText === 'undefined') return;
+
+  if (dynamicWordEl._splitInstance) dynamicWordEl._splitInstance.revert();
+  dynamicWordEl.setAttribute('data-skip-split', 'true');
+
+  const config = {
+    words: ['Film & Music', 'Fashion', 'Culture'],
+    charStagger: 0.02,
+    duration: 0.7,
+    hold: 1.2,
+    ease: { in: 'power2.out', out: 'power2.in' },
+    hidden: { opacity: 0, yPercent: 10, filter: 'blur(4px)' },
+    visible: { opacity: 1, yPercent: 0, filter: 'blur(0px)' }
+  };
+
+  let i = 0;
+
+  function cycle() {
+    if (dynamicWordEl._splitInstance) dynamicWordEl._splitInstance.revert();
+
+    dynamicWordEl.textContent = config.words[i];
+    const split = new SplitText(dynamicWordEl, { type: 'chars' });
+    dynamicWordEl._splitInstance = split;
+
+    gsap.set(split.chars, { ...config.hidden, willChange: 'transform, opacity, filter', force3D: true });
+    gsap.set(dynamicWordEl, { opacity: 1 });
+
+    const tl = gsap.timeline({
+      onComplete: () => { i = (i + 1) % config.words.length; cycle(); }
+    });
+
+    tl.to(split.chars, {
+      ...config.visible, stagger: config.charStagger,
+      duration: config.duration, ease: config.ease.in
+    });
+    tl.to({}, { duration: config.hold });
+    tl.to(split.chars, {
+      ...config.hidden, stagger: config.charStagger,
+      duration: config.duration, ease: config.ease.out,
+      onComplete: () => gsap.set(split.chars, { clearProps: 'willChange,filter' })
+    });
+  }
+
+  cycle();
+}
+</script>

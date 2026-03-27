@@ -1,0 +1,810 @@
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        class PortfolioAnimation {
+            constructor() {
+                this.container = document.querySelector(".feed-section");
+                this.wrapper = document.querySelector(".feed-wrapper");
+                this.slides = [];
+                this.textElements = [];
+                this.splitInstances = [];
+                this.activeIndex = -1;
+
+                this.textConfig = {
+                    duration: 1.1,
+                    stagger: 0.2,
+                    blurStart: 10,
+                    delay: 0.05,
+                    ease: "power2.out",
+                };
+
+                if (
+                    !this.container ||
+                    !this.wrapper ||
+                    !window.gsap ||
+                    !window.SplitText
+                ) {
+                    console.error(
+                        "PortfolioAnimation: Missing required elements, GSAP, or SplitText",
+                    );
+                    return;
+                }
+
+                gsap.registerPlugin(ScrollTrigger, SplitText);
+                this.init();
+            }
+
+            init() {
+                this.slides = Array.from(
+                    this.wrapper.querySelectorAll(".feed-project"),
+                );
+                if (this.slides.length === 0) return;
+
+                this.slides.forEach((slide, i) => {
+                    const title = slide.querySelector(".feed-title");
+                    const category = slide.querySelector(".feed-category");
+                    const description = slide.querySelector(
+                        ".feed-project-description",
+                    );
+
+                    const words = [];
+
+                    [title, category, description].forEach((el) => {
+                        if (!el || !el.textContent.trim()) return;
+
+                        const split = new SplitText(el, {
+                            type: "words",
+                            wordsClass: "word",
+                        });
+                        this.splitInstances.push(split);
+                        words.push(...split.words);
+                    });
+
+                    this.textElements.push({ words });
+
+                    if (words.length) {
+                        gsap.set(words, {
+                            opacity: 0,
+                            filter: `blur(${this.textConfig.blurStart}px)`,
+                            willChange: "transform, opacity, filter",
+                        });
+                    }
+                });
+
+                this.createTriggers();
+            }
+
+            createTriggers() {
+                const lastIndex = this.slides.length - 1;
+
+                this.slides.forEach((slide, i) => {
+                    const isLast = i === lastIndex;
+                    ScrollTrigger.create({
+                        trigger: slide,
+                        start: "top center",
+                        // FIX #2: Last slide gets extra scroll distance so sticky text
+                        // reaches the bottom of its container before deactivation
+                        end: isLast ? "bottom 25%" : "bottom center",
+                        onEnter: () => this.activateSlide(i),
+                        onEnterBack: () => this.activateSlide(i),
+                    });
+                });
+
+                // Section-level trigger for complete hide on exit
+                ScrollTrigger.create({
+                    trigger: this.container,
+                    start: "top bottom",
+                    end: "bottom top",
+                    onLeave: () => this.hideAll(),
+                    onLeaveBack: () => this.hideAll(),
+                });
+            }
+
+            activateSlide(index) {
+                if (this.activeIndex === index) return;
+
+                const prevIndex = this.activeIndex;
+
+                // Deactivate previous
+                if (prevIndex >= 0) {
+                    this.slides[prevIndex].classList.remove("is-active");
+                    this.animateTextOut(prevIndex);
+                }
+
+                this.activeIndex = index;
+                this.slides[index].classList.add("is-active");
+                this.animateTextIn(index);
+
+                // FIX #3: Reset inner slider to first slide when project becomes active
+                if (window.portfolioSlider) {
+                    window.portfolioSlider.restartSlider(this.slides[index]);
+                }
+            }
+
+            animateTextIn(index) {
+                const { words } = this.textElements[index];
+                if (!words.length) return;
+
+                gsap.killTweensOf(words);
+
+                gsap.set(words, {
+                    opacity: 0,
+                    filter: `blur(${this.textConfig.blurStart}px)`,
+                });
+
+                gsap.to(words, {
+                    opacity: 1,
+                    filter: "blur(0px)",
+                    duration: this.textConfig.duration,
+                    delay: this.textConfig.delay,
+                    stagger: { amount: this.textConfig.stagger },
+                    ease: this.textConfig.ease,
+                    onComplete: function () {
+                        gsap.set(this.targets(), {
+                            clearProps: "willChange,filter",
+                        });
+                    },
+                });
+            }
+
+            animateTextOut(index) {
+                const { words } = this.textElements[index];
+                if (!words.length) return;
+
+                gsap.killTweensOf(words);
+                gsap.to(words, {
+                    opacity: 0,
+                    filter: `blur(${this.textConfig.blurStart}px)`,
+                    duration: 0.3,
+                    stagger: 0.02,
+                    ease: "power2.in",
+                });
+            }
+
+            hideAll() {
+                this.textElements.forEach(({ words }) => {
+                    if (words.length) {
+                        gsap.killTweensOf(words);
+                        gsap.set(words, {
+                            opacity: 0,
+                            filter: `blur(${this.textConfig.blurStart}px)`,
+                        });
+                    }
+                });
+
+                this.slides.forEach((s) => s.classList.remove("is-active"));
+                this.activeIndex = -1;
+            }
+        }
+
+        window.portfolioAnimation = new PortfolioAnimation();
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        class PortfolioSlider {
+            constructor() {
+                this.container = document.querySelector(".feed-section");
+                this.wrapper = document.querySelector(".feed-wrapper");
+                this.projects = [];
+                this.activeProjectIndex = -1;
+
+                if (!this.container || !this.wrapper || !window.gsap) {
+                    console.error(
+                        "PortfolioSlider: Missing container, wrapper, or GSAP",
+                    );
+                    return;
+                }
+
+                this.init();
+            }
+
+            init() {
+                this.projects = Array.from(
+                    this.wrapper.querySelectorAll(".feed-project"),
+                );
+                if (this.projects.length === 0) return;
+
+                this.projects.forEach((project, i) => {
+                    project.dataset.index = i;
+                    project.dataset.innerIndex = 0;
+                    this.setupInnerSlider(project);
+                });
+
+                this.attachEvents();
+                this.setupActiveProjectWatcher();
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // ACTIVE PROJECT WATCHER
+            // ─────────────────────────────────────────────────────────────
+
+            setupActiveProjectWatcher() {
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName !== "class") return;
+
+                        const project = mutation.target;
+                        const index = parseInt(project.dataset.index, 10);
+                        const isNowActive =
+                            project.classList.contains("is-active");
+
+                        if (isNowActive && index !== this.activeProjectIndex) {
+                            this.activeProjectIndex = index;
+                            this.playVisibleVideo(project);
+                        } else if (
+                            !isNowActive &&
+                            index === this.activeProjectIndex
+                        ) {
+                            this.activeProjectIndex = -1;
+                            this.pauseAllVideos(project);
+                        }
+                    });
+                });
+
+                this.projects.forEach((project) => {
+                    observer.observe(project, {
+                        attributes: true,
+                        attributeFilter: ["class"],
+                    });
+                });
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // VIDEO CONTROL (Native <video>)
+            // ─────────────────────────────────────────────────────────────
+
+            playVideo(video) {
+                if (!video || video.tagName !== "VIDEO") return;
+
+                if (video.preload === "none" && video.readyState === 0) {
+                    video.preload = "auto";
+                    video.load();
+                }
+
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {});
+                }
+            }
+
+            pauseVideo(video) {
+                if (!video || video.tagName !== "VIDEO") return;
+                video.pause();
+            }
+
+            playVisibleVideo(project) {
+                const currentIndex = parseInt(
+                    project.dataset.innerIndex || "0",
+                    10,
+                );
+                const slideItems = this.getSlideItems(project);
+                const currentSlide = slideItems[currentIndex];
+                if (!currentSlide) return;
+
+                const video = currentSlide.querySelector("video.feed-video");
+                if (video) this.playVideo(video);
+            }
+
+            pauseAllVideos(project) {
+                const videos = project.querySelectorAll("video.feed-video");
+                videos.forEach((video) => this.pauseVideo(video));
+            }
+
+            handleSlideVideoTransition(project, fromIndex, toIndex) {
+                const slideItems = this.getSlideItems(project);
+
+                const fromSlide = slideItems[fromIndex];
+                if (fromSlide) {
+                    const fromVideo =
+                        fromSlide.querySelector("video.feed-video");
+                    if (fromVideo) this.pauseVideo(fromVideo);
+                }
+
+                const toSlide = slideItems[toIndex];
+                if (toSlide) {
+                    const toVideo = toSlide.querySelector("video.feed-video");
+                    if (toVideo) this.playVideo(toVideo);
+                }
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // INNER SLIDER FUNCTIONS
+            // ─────────────────────────────────────────────────────────────
+
+            setupInnerSlider(project) {
+                const sliderWrapper = project.querySelector(
+                    ".feed-project-slider",
+                );
+                const sliderList = project.querySelector(
+                    ".feed-inner-slider-list",
+                );
+                if (!sliderList) return;
+
+                const slideItems = sliderList.querySelectorAll(
+                    ".feed-slider-slide:not(.w-condition-invisible)",
+                );
+                if (slideItems.length <= 1) return;
+
+                // Setup dots nav
+                const existingDotsNav = project.querySelector(
+                    ".feed-inner-slider-nav",
+                );
+                if (existingDotsNav) {
+                    const existingDots = existingDotsNav.querySelectorAll(
+                        ".feed-inner-slider-dot",
+                    );
+                    for (
+                        let i = existingDots.length;
+                        i < slideItems.length;
+                        i++
+                    ) {
+                        const dot = document.createElement("div");
+                        dot.className = "feed-inner-slider-dot";
+                        dot.dataset.index = i;
+                        existingDotsNav.appendChild(dot);
+                    }
+                    const firstDot = existingDotsNav.querySelector(
+                        ".feed-inner-slider-dot",
+                    );
+                    if (firstDot) firstDot.classList.add("active");
+                }
+
+                // Hide prev zone initially
+                const prevZone = sliderWrapper?.querySelector(".slide-prev");
+                if (prevZone) prevZone.style.display = "none";
+
+                // FIX #4: First slide — next zone covers full width
+                const nextZone = sliderWrapper?.querySelector(".slide-next");
+                if (nextZone) {
+                    nextZone.style.left = "0";
+                    nextZone.style.width = "100%";
+                }
+            }
+
+            getSlideItems(project) {
+                const sliderList = project.querySelector(
+                    ".feed-inner-slider-list",
+                );
+                if (!sliderList) return [];
+                return Array.from(
+                    sliderList.querySelectorAll(
+                        ".feed-slider-slide:not(.w-condition-invisible)",
+                    ),
+                );
+            }
+
+            navigateInnerSlider(project, direction) {
+                const sliderList = project.querySelector(
+                    ".feed-inner-slider-list",
+                );
+                if (!sliderList) return;
+
+                const slideItems = this.getSlideItems(project);
+                const dots = project.querySelectorAll(".feed-inner-slider-dot");
+
+                if (slideItems.length <= 1 || gsap.isTweening(sliderList))
+                    return;
+
+                let currentIndex = parseInt(
+                    project.dataset.innerIndex || "0",
+                    10,
+                );
+                let nextIndex = currentIndex + direction;
+
+                if (nextIndex < 0) nextIndex = 0;
+                if (nextIndex >= slideItems.length)
+                    nextIndex = slideItems.length - 1;
+                if (nextIndex === currentIndex) return;
+
+                const slideWidth = slideItems[0]?.offsetWidth || 0;
+                gsap.to(sliderList, {
+                    x: -slideWidth * nextIndex,
+                    duration: 0.55,
+                    ease: "power3.inOut",
+                });
+
+                if (dots[currentIndex])
+                    dots[currentIndex].classList.remove("active");
+                if (dots[nextIndex]) dots[nextIndex].classList.add("active");
+                project.dataset.innerIndex = nextIndex;
+
+                this.handleSlideVideoTransition(
+                    project,
+                    currentIndex,
+                    nextIndex,
+                );
+                this.updateNavVisibility(project, nextIndex, slideItems.length);
+            }
+
+            navigateToIndex(project, targetIndex) {
+                const sliderList = project.querySelector(
+                    ".feed-inner-slider-list",
+                );
+                if (!sliderList) return;
+
+                const slideItems = this.getSlideItems(project);
+                const dots = project.querySelectorAll(".feed-inner-slider-dot");
+
+                if (slideItems.length <= 1 || gsap.isTweening(sliderList))
+                    return;
+
+                const currentIndex = parseInt(
+                    project.dataset.innerIndex || "0",
+                    10,
+                );
+                if (targetIndex === currentIndex) return;
+
+                const slideWidth = slideItems[0]?.offsetWidth || 0;
+                gsap.to(sliderList, {
+                    x: -slideWidth * targetIndex,
+                    duration: 0.55,
+                    ease: "power3.inOut",
+                });
+
+                if (dots[currentIndex])
+                    dots[currentIndex].classList.remove("active");
+                if (dots[targetIndex])
+                    dots[targetIndex].classList.add("active");
+                project.dataset.innerIndex = targetIndex;
+
+                this.handleSlideVideoTransition(
+                    project,
+                    currentIndex,
+                    targetIndex,
+                );
+                this.updateNavVisibility(
+                    project,
+                    targetIndex,
+                    slideItems.length,
+                );
+            }
+
+            restartSlider(project) {
+                const currentIndex = parseInt(
+                    project.dataset.innerIndex || "0",
+                    10,
+                );
+
+                this.navigateToIndex(project, 0);
+
+                if (currentIndex === 0) {
+                    this.playVisibleVideo(project);
+                }
+            }
+
+            updateNavVisibility(project, currentIndex, totalItems) {
+                const sliderWrapper = project.querySelector(
+                    ".feed-project-slider",
+                );
+                if (!sliderWrapper) return;
+
+                const prevZone = sliderWrapper.querySelector(".slide-prev");
+                const nextZone = sliderWrapper.querySelector(".slide-next");
+
+                const isFirstSlide = currentIndex === 0;
+                const isLastSlide = currentIndex === totalItems - 1;
+
+                // Hide prev on first/last slide, hide next on last slide
+                if (prevZone)
+                    prevZone.style.display =
+                        isFirstSlide || isLastSlide ? "none" : "block";
+                if (nextZone)
+                    nextZone.style.display = isLastSlide ? "none" : "block";
+
+                // FIX #4: First slide — next zone covers full width (no prev zone visible)
+                // Subsequent slides — next zone shrinks to default right-half position
+                if (nextZone && !isLastSlide) {
+                    if (isFirstSlide) {
+                        nextZone.style.left = "0";
+                        nextZone.style.width = "100%";
+                    } else {
+                        nextZone.style.left = "";
+                        nextZone.style.width = "";
+                    }
+                }
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // EVENT HANDLERS
+            // ─────────────────────────────────────────────────────────────
+
+            attachEvents() {
+                // Hover: preload the next/prev slide's video
+                this.wrapper.addEventListener(
+                    "mouseenter",
+                    (e) => {
+                        const nextZone = e.target.closest(".slide-next");
+                        const prevZone = e.target.closest(".slide-prev");
+
+                        if (nextZone || prevZone) {
+                            const project = e.target.closest(".feed-project");
+                            if (!project) return;
+
+                            const currentIndex = parseInt(
+                                project.dataset.innerIndex || "0",
+                                10,
+                            );
+                            const slideItems = this.getSlideItems(project);
+                            const targetIndex = nextZone
+                                ? currentIndex + 1
+                                : currentIndex - 1;
+
+                            if (
+                                targetIndex >= 0 &&
+                                targetIndex < slideItems.length
+                            ) {
+                                const targetSlide = slideItems[targetIndex];
+                                const video =
+                                    targetSlide?.querySelector(
+                                        "video.feed-video",
+                                    );
+                                if (video) {
+                                    if (
+                                        video.preload === "none" &&
+                                        video.readyState === 0
+                                    ) {
+                                        video.preload = "auto";
+                                        video.load();
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    true,
+                );
+
+                // Click events
+                this.wrapper.addEventListener("click", (e) => {
+                    const project = e.target.closest(".feed-project");
+                    if (!project) return;
+
+                    // Restart button
+                    if (e.target.closest(".slide-restart")) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.restartSlider(project);
+                        return;
+                    }
+
+                    // Next zone
+                    if (e.target.closest(".slide-next")) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.navigateInnerSlider(project, 1);
+                        return;
+                    }
+
+                    // Prev zone
+                    if (e.target.closest(".slide-prev")) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.navigateInnerSlider(project, -1);
+                        return;
+                    }
+
+                    // Dot navigation
+                    const dot = e.target.closest(".feed-inner-slider-dot");
+                    if (dot) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.navigateToIndex(
+                            project,
+                            parseInt(dot.dataset.index, 10),
+                        );
+                        return;
+                    }
+
+                    // Case study slide click (not on link) — go back
+                    const caseStudySlide = e.target.closest(".feed-view-case");
+                    const caseStudyLink = e.target.closest(".feed-view-case a");
+                    if (caseStudySlide && !caseStudyLink) {
+                        e.preventDefault();
+                        this.navigateInnerSlider(project, -1);
+                    }
+                });
+            }
+        }
+
+        window.PortfolioSlider = PortfolioSlider;
+        window.portfolioSlider = new PortfolioSlider();
+    });
+</script>
+
+<style>
+    /* ===================================================
+   MOBILE / TABLET OVERRIDES
+   =================================================== */
+    @media (max-width: 1200px) {
+        .feed-project {
+            flex-direction: column;
+            align-items: center;
+            padding: 0px 0px 160px;
+        }
+
+        .feed-project-slider {
+            width: 100%;
+            height: auto !important;
+        }
+
+        .feed-info {
+            align-items: center !important;
+            text-align: center !important;
+            flex-direction: column;
+            position: relative !important;
+            top: 0px;
+        }
+    }
+
+    /* Undo the native Webflow tablet styles so they don't double-fire */
+    @media (max-width: 991px) {
+        .feed-project {
+            flex-direction: column; /* already handled, just keep consistent */
+        }
+    }
+</style>
+
+//// SNAPSHOT SECTION IMAGE TRAIL
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        (function () {
+            const container = document.querySelector(".trail_wrap");
+            if (!container) return;
+            const trigger = container.parentElement;
+            if (!trigger) return;
+
+            const MathUtils = {
+                lerp: (a, b, n) => (1 - n) * a + n * b,
+                distance: (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1),
+            };
+
+            const getMousePos = (ev) => {
+                const rect = container.getBoundingClientRect();
+                return {
+                    x: ev.clientX - rect.left,
+                    y: ev.clientY - rect.top,
+                };
+            };
+
+            let mousePos = { x: 0, y: 0 },
+                cacheMousePos = { x: 0, y: 0 },
+                lastMousePos = { x: 0, y: 0 };
+
+            trigger.addEventListener("mousemove", (ev) => {
+                mousePos = getMousePos(ev);
+            });
+
+            class ImageItem {
+                constructor(el) {
+                    this.DOM = { el: el };
+                    this.defaultStyle = { scale: 0, x: 0, y: 0, opacity: 1 };
+                    this.getRect();
+                    this.initEvents();
+                }
+                initEvents() {
+                    window.addEventListener("resize", () => this.resize());
+                }
+                resize() {
+                    gsap.set(this.DOM.el, this.defaultStyle);
+                    this.getRect();
+                }
+                getRect() {
+                    this.rect = this.DOM.el.getBoundingClientRect();
+                }
+                isActive() {
+                    return (
+                        gsap.isTweening(this.DOM.el) ||
+                        this.DOM.el.style.transform.indexOf("scale(0)") === -1
+                    );
+                }
+            }
+
+            class ImageTrail {
+                constructor() {
+                    this.DOM = { content: container };
+                    this.images = [];
+                    [
+                        ...this.DOM.content.querySelectorAll(
+                            ".trail_scale-img",
+                        ),
+                    ].forEach((img) => this.images.push(new ImageItem(img)));
+                    this.imagesTotal = this.images.length;
+                    if (this.imagesTotal === 0) return;
+                    this.imgPosition = 0;
+                    this.zIndexVal = 1;
+                    this.threshold = 100;
+                    requestAnimationFrame(() => this.render());
+                }
+                render() {
+                    let distance = MathUtils.distance(
+                        mousePos.x,
+                        mousePos.y,
+                        lastMousePos.x,
+                        lastMousePos.y,
+                    );
+                    cacheMousePos.x = MathUtils.lerp(
+                        cacheMousePos.x || mousePos.x,
+                        mousePos.x,
+                        0.1,
+                    );
+                    cacheMousePos.y = MathUtils.lerp(
+                        cacheMousePos.y || mousePos.y,
+                        mousePos.y,
+                        0.1,
+                    );
+                    if (distance > this.threshold) {
+                        this.showNextImage();
+                        this.zIndexVal++;
+                        this.imgPosition =
+                            this.imgPosition < this.imagesTotal - 1
+                                ? this.imgPosition + 1
+                                : 0;
+                        lastMousePos = { ...mousePos };
+                    }
+                    let isIdle = true;
+                    for (let img of this.images) {
+                        if (img.isActive()) {
+                            isIdle = false;
+                            break;
+                        }
+                    }
+                    if (isIdle && this.zIndexVal !== 1) {
+                        this.zIndexVal = 1;
+                    }
+                    requestAnimationFrame(() => this.render());
+                }
+                showNextImage() {
+                    const img = this.images[this.imgPosition];
+                    if (!img) return;
+                    gsap.killTweensOf(img.DOM.el);
+                    gsap.timeline()
+                        .set(img.DOM.el, {
+                            scale: 0,
+                            zIndex: this.zIndexVal,
+                            x: cacheMousePos.x - img.rect.width / 2,
+                            y: cacheMousePos.y - img.rect.height / 2,
+                            immediateRender: true,
+                        })
+                        .to(
+                            img.DOM.el,
+                            {
+                                duration: 0.6,
+                                ease: "expo.out",
+                                scale: 1,
+                                x: mousePos.x - img.rect.width / 2,
+                                y: mousePos.y - img.rect.height / 2,
+                            },
+                            0,
+                        )
+                        .to(
+                            img.DOM.el,
+                            {
+                                duration: 0.8,
+                                ease: "power2.in",
+                                scale: 0,
+                            },
+                            0.5,
+                        );
+                }
+            }
+
+            const preloadImages = () => {
+                return new Promise((resolve) => {
+                    if (typeof imagesLoaded !== "undefined") {
+                        imagesLoaded(
+                            document.querySelectorAll(".trail_scale-img"),
+                            resolve,
+                        );
+                    } else {
+                        resolve();
+                    }
+                });
+            };
+
+            preloadImages().then(() => {
+                new ImageTrail();
+            });
+        })();
+    });
+</script>

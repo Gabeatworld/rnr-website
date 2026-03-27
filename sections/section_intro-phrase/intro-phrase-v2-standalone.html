@@ -1,0 +1,163 @@
+<style>
+    .intro-phrase-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #1a1a1a;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+    }
+    .intro-phrase__text {
+        display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.3em;
+        color: #f5f5f0;
+    }
+    .intro-phrase__word {
+        display: inline-block;
+        white-space: pre;
+    }
+    /* Hide feed until intro reveals it */
+    html.has-intro .feed-wrapper-cms {
+        opacity: 0;
+    }
+</style>
+
+<script>
+    (function () {
+        /* ── 1. Build overlay ── */
+        var overlay = document.createElement("div");
+        overlay.className = "intro-phrase-overlay intro-overlay";
+        var textEl = document.createElement("span");
+        textEl.className = "intro-phrase__text size-5";
+        overlay.appendChild(textEl);
+        document.body.appendChild(overlay);
+
+        /* ── 2. Pick phrase ── */
+        var newPhrases = [
+            "We build for the bold.",
+            "Where culture meets craft.",
+            "Your vision. Our obsession.",
+            "This is where it starts.",
+            "Made for those who move culture.",
+            "Not for everyone. For you.",
+        ];
+        var returnPhrases = [
+            "Back for more? Good.",
+            "Let's make something again.",
+            "Missed you. Let's go.",
+            "You know the vibe.",
+            "Ready when you are.",
+            "Welcome back. Let's work.",
+        ];
+        var isReturn = !!sessionStorage.getItem("rnr-intro-seen");
+        var phrases = isReturn ? returnPhrases : newPhrases;
+        var lastPhrase = sessionStorage.getItem("rnr-last-phrase");
+        var available = phrases.filter(function (p) { return p !== lastPhrase; });
+        var phrase =
+            available[Math.floor(Math.random() * available.length)] ||
+            phrases[0];
+        sessionStorage.setItem("rnr-last-phrase", phrase);
+        if (!isReturn) sessionStorage.setItem("rnr-intro-seen", "1");
+
+        /* ── 3. Timing ── */
+        var WORD_STAGGER = 220;
+        var BLUR_START = 14;
+        var BLUR_DURATION = 600;
+        var START_DELAY = 400;
+        var HOLD_AFTER = 800;
+        var OVERLAY_FADE = 0.6;
+
+        /* ── 4. Build words ── */
+        var words = phrase.split(" ");
+        var wordEls = [];
+        words.forEach(function (word) {
+            var span = document.createElement("span");
+            span.className = "intro-phrase__word";
+            span.textContent = word;
+            span.style.opacity = "0";
+            span.style.filter = "blur(" + BLUR_START + "px)";
+            span.style.transform = "translateY(4px)";
+            textEl.appendChild(span);
+            wordEls.push(span);
+        });
+
+        function revealWord(el) {
+            el.style.opacity = "1";
+            el.style.transition =
+                "opacity 0.3s ease-out, filter " +
+                BLUR_DURATION +
+                "ms ease-out, transform " +
+                BLUR_DURATION +
+                "ms ease-out";
+            requestAnimationFrame(function () {
+                el.style.filter = "blur(0px)";
+                el.style.transform = "translateY(0)";
+            });
+        }
+
+        /* ── 5. Play phrase, then fade in feed ── */
+        setTimeout(function () {
+            wordEls.forEach(function (el, i) {
+                setTimeout(function () { revealWord(el); }, i * WORD_STAGGER);
+            });
+
+            var totalDuration =
+                (wordEls.length - 1) * WORD_STAGGER +
+                BLUR_DURATION +
+                HOLD_AFTER;
+
+            setTimeout(function () {
+                // Make page-wrapper visible (skip CSS blur transition)
+                var pw = document.querySelector(".page-wrapper");
+                if (pw) {
+                    pw.style.transition = "none";
+                    pw.style.opacity = "1";
+                    pw.style.filter = "none";
+                    pw.offsetHeight;
+                    pw.style.transition = "";
+                }
+
+                // Remove has-intro, signal ready
+                document.documentElement.classList.add("hero-ready");
+                document.documentElement.classList.remove("has-intro");
+                document.body.classList.add("page-entering");
+
+                // Activate first project for scroll animation
+                var firstProject = document.querySelector(".feed-project");
+                if (firstProject) firstProject.classList.add("is-active");
+
+                // Signal other scripts
+                window.__rnrIntroDone = true;
+                window.dispatchEvent(new CustomEvent("rnr:intro-done"));
+
+                // Fade out overlay
+                overlay.style.transition = "opacity " + OVERLAY_FADE + "s ease-in-out";
+                overlay.style.opacity = "0";
+                overlay.addEventListener("transitionend", function () {
+                    overlay.remove();
+                });
+
+                // Fade in .feed-wrapper-cms
+                var feedCms = document.querySelector(".feed-wrapper-cms");
+                if (feedCms && typeof gsap !== "undefined") {
+                    gsap.fromTo(feedCms,
+                        { opacity: 0 },
+                        { opacity: 1, duration: 0.6, ease: "power2.out", delay: 0.2 }
+                    );
+                }
+
+                // Refresh ScrollTrigger after reveal
+                setTimeout(function () {
+                    if (typeof ScrollTrigger !== "undefined") ScrollTrigger.refresh();
+                }, 1000);
+            }, totalDuration);
+        }, START_DELAY);
+    })();
+</script>

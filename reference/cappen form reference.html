@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cappen Form Reference</title>
+<style>
+/* ============================================
+   CAPPEN FORM — REFERENCE STYLES
+   Source: cappen.com
+   Purpose: HTML reference for Webflow conversion
+   ============================================ */
+
+/* --- CSS Variables (some are set via JS on their site, hardcoded here) --- */
+:root {
+  --light-black: #141414;
+  --black: #000000;
+  --light-gray: #d8d7d5;
+  --outlines: rgba(216, 215, 213, 0.15);
+  --border-radius: 0.5rem;
+  --global-padding: 1.25rem;
+  --font-size: 0.625rem;
+  --vh: 100vh;
+  --svh: 100vh;
+  --navbar-padding: calc(2.3125rem + var(--global-padding) * 2);
+}
+
+/* --- Font Faces --- */
+@font-face {
+  font-family: "Martian Mono";
+  font-display: swap;
+  font-style: normal;
+  font-weight: 300;
+  src: url("https://cappen.com/wp-content/themes/cappen/font/MartianMono-Light.7f8c6.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "HelveticaNowDisplay";
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+  src: url("https://cappen.com/wp-content/themes/cappen/font/HelveticaNowDisplay-Regular.51aa5.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "HelveticaNowDisplay";
+  font-display: swap;
+  font-style: normal;
+  font-weight: 900;
+  src: url("https://cappen.com/wp-content/themes/cappen/font/HelveticaNowDisplay-Black.cf950.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "PP Editorial New";
+  font-display: swap;
+  font-style: normal;
+  font-weight: 200;
+  src: url("https://cappen.com/wp-content/themes/cappen/font/PPEditorialNew-Ultralight.d1319.woff2") format("woff2");
+}
+
+/* --- Reset --- */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--light-black);
+  color: var(--light-gray);
+  font-family: HelveticaNowDisplay, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+input {
+  background: none;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+}
+
+form {
+  margin: 0;
+}
+
+/* --- Layout Wrapper --- */
+.talk__form-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--global-padding);
+}
+
+.talk__form-sticky {
+  align-items: center;
+  display: flex;
+  width: 100%;
+  max-width: 42.5rem;
+}
+
+/* --- Form --- */
+.talk__form {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  height: 33.75rem;
+  max-height: 100%;
+  position: relative;
+  width: 100%;
+}
+
+@media (min-width: 600px) {
+  .talk__form {
+    height: 37.5rem;
+  }
+}
+
+@media (min-width: 1025px) {
+  .talk__form {
+    height: 33.75rem;
+    width: 42.5rem;
+  }
+}
+
+/* --- Form Boxes --- */
+.talk__form__box {
+  display: flex;
+  justify-content: flex-end;
+  position: relative;
+  width: 100%;
+}
+
+.talk__form__box:nth-child(2) {
+  flex: 1;
+}
+
+/* --- Form Lines (bordered rows) --- */
+.talk__form__line {
+  border: 1px solid var(--outlines);
+  border-radius: var(--border-radius);
+  overflow: clip;
+  position: relative;
+  width: 100%;
+}
+
+.talk__form__line-wrapper {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  justify-content: space-between;
+  padding: 1.25rem;
+  width: 100%;
+}
+
+/* --- TO / SEND rows (monospace, small) --- */
+.talk__form__to,
+.talk__form__send {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  font-family: "Martian Mono", monospace;
+  font-size: var(--font-size);
+  font-style: normal;
+  font-weight: 300;
+  justify-content: space-between;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+/* --- Message Area --- */
+.talk__form__message {
+  height: 100%;
+  overflow: clip;
+  position: absolute;
+  font-family: HelveticaNowDisplay, Helvetica, Arial, sans-serif;
+  font-size: 1.375rem;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+}
+
+@media (min-width: 600px) {
+  .talk__form__message {
+    font-size: 1.5625rem;
+    line-height: 1.16;
+  }
+}
+
+.talk__form__message__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  overflow-y: auto;
+  height: 100%;
+}
+
+@media (min-width: 1025px) {
+  .talk__form__message__content {
+    width: 42.5rem;
+  }
+}
+
+/* --- Message Steps --- */
+.talk__form__message__wrapper {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.625rem;
+  justify-content: flex-start;
+  max-width: 100%;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  transition: opacity 0.35s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+.talk__form__message__wrapper > span {
+  max-width: 100%;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.talk__form__message__wrapper span:not(.talk__form__message__value):not(.selection) {
+  position: relative;
+  vertical-align: middle;
+}
+
+/* Visible states */
+.talk__form__message__wrapper.show {
+  opacity: 0.4;
+  pointer-events: all;
+}
+
+.talk__form__message.focus .talk__form__message__wrapper.active {
+  opacity: 1;
+  transition-timing-function: cubic-bezier(0.5, 1, 0.89, 1);
+}
+
+.talk__form__message.focus .talk__form__message__wrapper.active span.options {
+  pointer-events: all;
+}
+
+.talk__form__message.focus .talk__form__message__wrapper.active.valid .tag {
+  scale: 1;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.talk__form.ready .talk__form__message .talk__form__message__wrapper.show {
+  opacity: 1;
+}
+
+/* --- Cursor blink --- */
+.talk__form__message__wrapper span.cursor {
+  animation: blink 0.65s step-start infinite;
+  background-color: var(--light-gray);
+  display: inline-flex;
+  height: 1.625rem;
+  position: absolute;
+  translate: 0 15%;
+  visibility: hidden;
+  width: 1px;
+}
+
+.talk__form__message.focus .talk__form__message__wrapper.active span.cursor {
+  visibility: visible;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* --- Selection highlight --- */
+.talk__form__message__wrapper span.selection {
+  background-color: var(--light-gray);
+  color: var(--light-black);
+}
+
+/* --- Options (pill selectors) --- */
+.talk__form__message__wrapper span.options {
+  line-height: 1.75;
+  pointer-events: none;
+  vertical-align: baseline;
+}
+
+.talk__form__message__wrapper span.options span {
+  background-color: rgba(216, 215, 213, 0.08);
+  border-radius: 100vmax;
+  cursor: pointer;
+  font-family: "Martian Mono", monospace;
+  font-size: var(--font-size);
+  font-style: normal;
+  font-weight: 300;
+  line-height: 1.6;
+  padding: 0.625rem;
+  text-transform: uppercase;
+  transition: all 0.3s cubic-bezier(0.5, 1, 0.89, 1);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.talk__form__message__wrapper span.options span.active {
+  background-color: #d8d7d5 !important;
+  color: var(--black);
+}
+
+@media (min-width: 1025px) {
+  .talk__form__message__wrapper span.options span:hover {
+    background-color: rgba(216, 215, 213, 0.2);
+  }
+}
+
+/* --- Tag (Enter key indicator) --- */
+.tag {
+  border: 1px solid var(--outlines);
+  border-radius: var(--border-radius);
+  display: inline-block;
+  font-family: "Martian Mono", monospace;
+  font-size: var(--font-size);
+  font-style: normal;
+  font-weight: 300;
+  line-height: 1.6;
+  padding: 0.625rem;
+  text-transform: uppercase;
+  scale: 0;
+  transform-origin: 0 50%;
+  transition: scale 0.25s cubic-bezier(0.36, 0, 0.66, -0.56),
+              background-color 0.35s cubic-bezier(0.5, 1, 0.89, 1),
+              color 0.35s cubic-bezier(0.5, 1, 0.89, 1);
+}
+
+@media (min-width: 1025px) {
+  .tag:hover {
+    background-color: #d8d7d5;
+    color: var(--black);
+  }
+}
+
+/* --- Text Inputs --- */
+.talk__form__message input[type="text"] {
+  box-sizing: border-box;
+  color: var(--light-gray);
+  font-family: HelveticaNowDisplay, Helvetica, Arial, sans-serif;
+  font-size: 1.375rem;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* When input is active, show it inline */
+.talk__form__message input[type="text"][style*="opacity: 1"] {
+  position: relative;
+  width: auto;
+  height: auto;
+  min-width: 3ch;
+  max-width: 100%;
+  padding: 0;
+  border-bottom: 1px solid var(--light-gray);
+}
+
+@media (min-width: 600px) {
+  .talk__form__message input[type="text"] {
+    font-size: 1.5625rem;
+    line-height: 1.16;
+  }
+}
+
+/* --- Button --- */
+.button {
+  background-color: var(--light-gray);
+  border-radius: var(--border-radius);
+  box-shadow: inset 0 0 0 1px transparent;
+  color: var(--black);
+  font-family: "Martian Mono", monospace;
+  font-size: var(--font-size);
+  font-style: normal;
+  font-weight: 300;
+  line-height: 1.6;
+  overflow: hidden;
+  padding: 0.625rem;
+  text-align: center;
+  text-transform: uppercase;
+  transition: background-color 0.3s cubic-bezier(0.5, 1, 0.89, 1),
+              color 0.3s cubic-bezier(0.5, 1, 0.89, 1),
+              box-shadow 0.3s cubic-bezier(0.5, 1, 0.89, 1);
+  white-space: nowrap;
+}
+
+@media (min-width: 1025px) {
+  .button:hover {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px var(--outlines);
+    color: var(--light-gray);
+  }
+}
+
+/* --- Send Button Area --- */
+.talk__form__send-wrapper {
+  padding-bottom: 0.625rem;
+  padding-top: 0.625rem;
+}
+
+.talk__form__send__dots {
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .talk__form__send__dots {
+    display: flex;
+  }
+}
+
+.talk__form__send__bt {
+  cursor: pointer;
+  opacity: 0.2;
+  pointer-events: none;
+  transition: opacity 0.35s cubic-bezier(0.45, 0, 0.55, 1);
+  width: 100%;
+}
+
+@media (min-width: 600px) {
+  .talk__form__send__bt {
+    width: auto;
+  }
+}
+
+.talk__form.ready .talk__form__send__bt {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* --- Success State --- */
+.talk__form__success {
+  align-items: flex-start;
+  border: 1px solid var(--outlines);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  height: 75%;
+  justify-content: space-between;
+  opacity: 0;
+  overflow: clip;
+  padding: 1.1875rem 1.6875rem;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+}
+
+@media (min-width: 1025px) {
+  .talk__form__success {
+    padding: 2.5rem 1.25rem;
+  }
+}
+
+.talk__form__success .mcgyver-1 {
+  font-family: HelveticaNowDisplay, Helvetica, Arial, sans-serif;
+  font-size: 1.375rem;
+  font-weight: 400;
+  line-height: 1;
+  width: 100%;
+}
+
+@media (min-width: 600px) {
+  .talk__form__success .mcgyver-1 {
+    font-size: 1.5625rem;
+    line-height: 1.16;
+  }
+}
+
+.talk__form__success .mcgyver-2 {
+  font-family: "PP Editorial New", Georgia, serif;
+  font-size: 2.25rem;
+  font-weight: 200;
+  line-height: 1;
+  width: 100%;
+}
+
+@media (min-width: 600px) {
+  .talk__form__success .mcgyver-2 {
+    font-size: 2.875rem;
+  }
+}
+
+@media (min-width: 1025px) {
+  .talk__form__success .mcgyver-2 {
+    width: 33.125rem;
+  }
+}
+
+/* --- Status Bar --- */
+.talk__form__status {
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--outlines);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: row;
+  font-family: "Martian Mono", monospace;
+  font-size: var(--font-size);
+  font-weight: 300;
+  height: 100%;
+  justify-content: center;
+  line-height: 1.6;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+/* --- Sending State --- */
+.talk__form.sending {
+  pointer-events: none;
+}
+
+.talk__form.sending * {
+  pointer-events: none !important;
+}
+
+.talk__form.sending .talk__form__message__content {
+  opacity: 0.5;
+}
+
+/* --- Macgyver (mobile line break) --- */
+@media (min-width: 1025px) {
+  .macgyver {
+    display: none;
+  }
+}
+
+/* --- Scene placeholder (hidden on mobile) --- */
+.talk__scene-place {
+  display: none;
+}
+
+@media (min-width: 1025px) {
+  .talk__scene-place {
+    align-items: center;
+    display: flex;
+    flex: 1;
+    flex-direction: row;
+    justify-content: center;
+    padding-left: 2.8125rem;
+  }
+}
+</style>
+</head>
+<body>
+
+<section class="talk__form-wrapper" style="--start: 0; opacity: 1;">
+	<div class="talk__form-sticky">
+		<form class="talk__form" data-component="talk-form" method="post" autocomplete="off">
+			<div class="talk__form__box">
+				<div class="talk__form__to talk__form__line" style="--start: 0;">
+					<div class="talk__form__line-wrapper">
+						<div>TO: CAPPEN</div>
+						<div data-component="copy-mail" data-mail="FELIPE@CAPPEN.COM">( FELIPE@CAPPEN.COM )</div>
+					</div>
+				</div>
+			</div>
+			<div class="talk__form__box">
+				<div class="talk__form__message talk__form__line focus" style="--start: 0;">
+					<div class="talk__form__message__content" style="translate: none; rotate: none; scale: none; transform: translate(0px, 0px);">
+						<div class="talk__form__message__wrapper talk__form__line-wrapper active show valid">
+							<span>Hey there! I'm the Cappen Bot. Ready to help you shape your next digital project. Just share a few details with me and I'll guide you to a tailored proposal.<br><br> Shall we get started? <br class="macgyver">Hit Enter &nbsp;<span class="tag" data-cursor="none">Enter</span></span>
+						</div>
+						<div class="talk__form__message__wrapper talk__form__line-wrapper">
+							<span>Hi, my name is <span class="talk__form__message__value"></span>&nbsp;<span class="tag" data-cursor="none">Enter</span></span>
+							<input type="text" aria-label="Name" name="name" maxlength="25" minlength="2" required="" tabindex="-1">
+						</div>
+						<div class="talk__form__message__wrapper talk__form__line-wrapper">
+							<span>You can email me at <span class="talk__form__message__value"></span>&nbsp;<span class="tag" data-cursor="none">Enter</span></span>
+							<input type="text" aria-label="Email" name="email" maxlength="50" minlength="4" required="" tabindex="-1">
+						</div>
+						<div class="talk__form__message__wrapper talk__form__line-wrapper">
+							<span>My project is a
+								<span class="options multiple">
+									<span>website developement</span>
+									<span>mobile app</span>
+									<span>e-commerce</span>
+									<span>2D / 3D</span>
+									<span>product design</span>
+									<span>immersive experience</span>
+									<span>brand &amp; visual identity</span>
+									<span>motion design</span>
+									<span>installation / activation</span>
+								</span>
+								<span class="tag" data-cursor="none">Enter</span>
+							</span>
+							<input type="hidden" name="project" required="" value="">
+						</div>
+						<div class="talk__form__message__wrapper talk__form__line-wrapper">
+							<span>My budget range is between
+								<span class="options">
+									<span>up to 5k</span>
+									<span>5k to 20k</span>
+									<span>20 to 50k</span>
+									<span>50k to 100k</span>
+									<span>over 100k</span>
+								</span>
+								<span class="tag" data-cursor="none">Enter</span>
+							</span>
+							<input type="hidden" name="budget" required="" value="">
+						</div>
+						<div class="talk__form__message__wrapper talk__form__line-wrapper">
+							<span>Additional note: <span class="talk__form__message__value"></span>&nbsp;<span class="tag" data-cursor="none">Enter</span></span>
+							<input type="text" aria-label="Note" name="note" minlength="0" maxlength="280" tabindex="-1">
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="talk__form__box">
+				<div class="talk__form__send talk__form__line" style="--start: 0;">
+					<div class="talk__form__send-wrapper talk__form__line-wrapper">
+						<div class="talk__form__send__dots">...</div>
+						<div class="talk__form__send__bt">
+							<div class="button">SEND REQUEST</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="talk__form__success">
+				<div class="mcgyver-1">Thanks for reaching out!</div>
+				<div class="mcgyver-2">We're already on it and will follow up with next steps soon.</div>
+			</div>
+			<div class="talk__form__status" style="--start-o: 1;">
+				<span></span>
+			</div>
+		</form>
+	</div>
+</section>
+
+<script>
+(() => {
+  const form = document.querySelector('[data-component="talk-form"]');
+  const steps = Array.from(form.querySelectorAll('.talk__form__message__wrapper'));
+  const sendBtn = form.querySelector('.talk__form__send__bt');
+  let currentIndex = 0;
+
+  function activateStep(index) {
+    steps.forEach((step, i) => {
+      step.classList.remove('active');
+      if (i <= index) {
+        step.classList.add('show');
+      }
+      if (i < index) {
+        step.classList.add('valid');
+      }
+    });
+
+    const step = steps[index];
+    step.classList.add('active', 'show');
+
+    // Focus text input if this step has one
+    const input = step.querySelector('input[type="text"]');
+    if (input) {
+      input.style.opacity = '1';
+      input.style.pointerEvents = 'all';
+      input.style.position = 'relative';
+      input.tabIndex = 0;
+      input.focus();
+    }
+
+    // Check if step already has a valid selection (for option steps)
+    checkValidity(step);
+
+    // Scroll the content so current step is visible
+    const content = form.querySelector('.talk__form__message__content');
+    const stepTop = step.offsetTop - content.offsetTop;
+    content.scrollTo({ top: stepTop - 20, behavior: 'smooth' });
+  }
+
+  function checkValidity(step) {
+    const input = step.querySelector('input');
+    const options = step.querySelector('.options');
+
+    if (!input && !options) {
+      // Intro step — always valid
+      step.classList.add('valid');
+      return true;
+    }
+
+    if (options) {
+      const hasSelection = step.querySelector('.options span.active');
+      if (hasSelection) {
+        step.classList.add('valid');
+        return true;
+      }
+      return false;
+    }
+
+    if (input) {
+      const min = parseInt(input.minLength) || 0;
+      if (input.value.length >= min) {
+        // Update the display value
+        const valueSpan = step.querySelector('.talk__form__message__value');
+        if (valueSpan) valueSpan.textContent = input.value;
+
+        if (input.value.length > 0 || min === 0) {
+          step.classList.add('valid');
+          return true;
+        }
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  function advanceStep() {
+    const step = steps[currentIndex];
+    if (!step.classList.contains('valid')) return;
+
+    // Freeze input on current step
+    const input = step.querySelector('input[type="text"]');
+    if (input) {
+      input.style.pointerEvents = 'none';
+      input.tabIndex = -1;
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) valueSpan.textContent = input.value;
+    }
+
+    currentIndex++;
+    if (currentIndex < steps.length) {
+      activateStep(currentIndex);
+    } else {
+      // All steps done — enable send button
+      form.classList.add('ready');
+    }
+  }
+
+  // Option pill click handler
+  form.querySelectorAll('.options span').forEach(option => {
+    option.addEventListener('click', () => {
+      const optionsContainer = option.closest('.options');
+      const isMultiple = optionsContainer.classList.contains('multiple');
+      const hiddenInput = option.closest('.talk__form__message__wrapper').querySelector('input[type="hidden"]');
+
+      if (isMultiple) {
+        option.classList.toggle('active');
+      } else {
+        optionsContainer.querySelectorAll('span').forEach(s => s.classList.remove('active'));
+        option.classList.add('active');
+      }
+
+      // Update hidden input value
+      if (hiddenInput) {
+        const selected = Array.from(optionsContainer.querySelectorAll('span.active'))
+          .map(s => s.textContent.trim());
+        hiddenInput.value = selected.join(', ');
+      }
+
+      // Check validity after selection
+      const step = option.closest('.talk__form__message__wrapper');
+      checkValidity(step);
+    });
+  });
+
+  // Text input — update value display in real-time
+  form.querySelectorAll('input[type="text"]').forEach(input => {
+    input.addEventListener('input', () => {
+      const step = input.closest('.talk__form__message__wrapper');
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) valueSpan.textContent = input.value;
+      checkValidity(step);
+    });
+  });
+
+  // Enter key handler
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      advanceStep();
+    }
+  });
+
+  // Send button
+  sendBtn.addEventListener('click', () => {
+    if (!form.classList.contains('ready')) return;
+    form.classList.add('sending');
+
+    // Show success
+    const success = form.querySelector('.talk__form__success');
+    success.style.opacity = '1';
+    success.style.pointerEvents = 'all';
+
+    // Hide the message content
+    form.querySelector('.talk__form__message__content').style.opacity = '0';
+  });
+
+  // Initialize first step
+  activateStep(0);
+})();
+</script>
+
+</body>
+</html>

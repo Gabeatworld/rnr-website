@@ -1,0 +1,26 @@
+<!-- Intro Lottie — ARCHIVED, replaced by section_intro-phrase
+     Was a code embed inside intro-overlay in Webflow
+     Uses lottie-web to load and play a Lottie JSON with completion callback -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.querySelector('.intro-lottie');
+  if (!container) { console.error('[LOTTIE] no .intro-lottie container'); return; }
+
+  const anim = lottie.loadAnimation({
+    container: container,
+    renderer: 'svg',
+    loop: false,
+    autoplay: true,
+    path: 'https://cdn.prod.website-files.com/5fa8f95d19746e653c988f4b/698598885bfb161d41f7a76e_Scene-1%20(1).json'
+  });
+
+  anim.addEventListener('complete', () => {
+    // Signal intro code that Lottie is done
+    if (typeof revealHeroElements === 'function') {
+      revealHeroElements();
+    }
+  });
+});
+</script>

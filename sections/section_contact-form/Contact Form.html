@@ -1,0 +1,744 @@
+<!-- ============================================
+     RNR CONTACT FORM — BALLPARK ESTIMATOR
+     Structure: HTML elements in Webflow, JS + CSS in separate embeds
+     Canvas element for WebGL blob: add as child of talk__form-wrapper
+     ============================================ -->
+
+<!-- HTML (Webflow elements — no embeds needed for this part) -->
+<section style="start:0;opacity:1" class="talk__form-wrapper">
+  <canvas class="talk__form__blob"></canvas>
+  <div class="talk__form-sticky">
+    <form data-component="talk-form" method="post" autocomplete="off" class="talk__form">
+      <!-- TO row -->
+      <div class="talk__form__box">
+        <div style="start:0" class="talk__form__to talk__form__line label">
+          <div class="talk__form__line-wrapper">
+            <div><span>TO: Gabe &amp; Caro</span></div>
+            <div data-component="copy-mail"><span>( hello@rnr.cool )</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- Message area -->
+      <div class="talk__form__box">
+        <div style="start:0" class="talk__form__message talk__form__line focus size-5">
+          <div style="translate:none;rotate:none;scale:none;transform:translate(0px, 0px)" class="talk__form__message__content">
+            <!-- Step 0: Intro -->
+            <div class="talk__form__message__wrapper talk__form__line-wrapper show valid active">
+              <span>
+                <span>Hey, we're glad you're here. Share a few details and we'll get back to you with a ballpark.</span>
+                <br><br>
+                <span>Ready?</span>
+                <br class="macgyver">
+                <span data-cursor="none" class="tag">Continue</span>
+              </span>
+            </div>
+            <!-- Step 1: Name -->
+            <div class="talk__form__message__wrapper talk__form__line-wrapper">
+              <span>
+                <span>First, what's your name?</span>
+                <span class="talk__form__message__value"></span>
+                <span data-cursor="none" class="tag">Continue</span>
+              </span>
+              <input type="text" aria-label="Name" name="name" maxlength="25" minlength="2" required="" tabindex="-1">
+            </div>
+            <!-- Step 2: Email -->
+            <div class="talk__form__message__wrapper talk__form__line-wrapper">
+              <span>
+                <span>And the best email to reach you?</span>
+                <span class="talk__form__message__value"></span>
+                <span data-cursor="none" class="tag">Continue</span>
+              </span>
+              <input type="text" aria-label="Email" name="email" maxlength="50" minlength="4" required="" tabindex="-1">
+            </div>
+            <!-- Step 3: Budget -->
+            <div class="talk__form__message__wrapper talk__form__line-wrapper">
+              <span>
+                <span>What's the budget range?</span>
+                <span class="options">
+                  <span>up to 5k</span>
+                  <span>5k to 20k</span>
+                  <span>20 to 50k</span>
+                  <span>50k to 100k</span>
+                  <span>over 100k</span>
+                </span>
+                <span data-cursor="none" class="tag">Continue</span>
+              </span>
+              <input type="hidden" name="budget" required="" value=" ">
+            </div>
+            <!-- Step 4: Message -->
+            <div class="talk__form__message__wrapper talk__form__line-wrapper">
+              <span>
+                <span>Give us the elevator pitch —</span>
+                <span class="talk__form__message__value"></span>
+                <span data-cursor="none" class="tag">Continue</span>
+              </span>
+              <input type="text" aria-label="Message" name="message" minlength="0" maxlength="280" tabindex="-1">
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Send row -->
+      <div class="talk__form__box">
+        <div style="start:0" class="talk__form__send talk__form__line label">
+          <div class="talk__form__send-wrapper talk__form__line-wrapper">
+            <div class="talk__form__send__dots"><span class="talk__form__step-count">1 / 4</span></div>
+            <div class="talk__form__send__bt">
+              <div class="button"><span>SEND REQUEST</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Success state -->
+      <div class="talk__form__success">
+        <div><span>Thanks for reaching out!</span></div>
+        <div><span>We'll follow up with a ballpark and next steps soon.</span></div>
+      </div>
+      <div style="start-o:1"><span></span></div>
+    </form>
+  </div>
+
+  <!-- ============================================
+       JS EMBED (Code Embed 1)
+       ============================================ -->
+  <div class="w-embed w-script"><script>
+(() => {
+  const SUBMIT_URL = 'https://proposal-builder.gabe-cf2.workers.dev/api/leads/submit';
+
+  const form = document.querySelector('[data-component="talk-form"]');
+  const steps = Array.from(form.querySelectorAll('.talk__form__message__wrapper'));
+  const sendBtn = form.querySelector('.talk__form__send__bt');
+  const stepCount = form.querySelector('.talk__form__step-count');
+  const totalSteps = steps.length - 1; // exclude intro
+  let currentIndex = 0;
+
+  function updateStepCount() {
+    if (!stepCount) return;
+    const display = Math.min(currentIndex, totalSteps);
+    stepCount.textContent = display + ' / ' + totalSteps;
+  }
+
+  function activateStep(index) {
+    steps.forEach((step, i) => {
+      step.classList.remove('active');
+      if (i <= index) step.classList.add('show');
+      if (i < index) step.classList.add('valid');
+    });
+    const step = steps[index];
+    step.classList.add('active', 'show');
+    const input = step.querySelector('input[type="text"]');
+    if (input) {
+      input.style.opacity = '1';
+      input.tabIndex = 0;
+      input.focus();
+      // Show the value span as live mirror, hide input visually
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) {
+        valueSpan.style.borderBottom = '1px solid currentColor';
+        valueSpan.style.minWidth = '3ch';
+        valueSpan.style.display = 'inline-block';
+      }
+    }
+    checkValidity(step);
+    updateStepCount();
+  }
+
+  function checkValidity(step) {
+    const input = step.querySelector('input');
+    const options = step.querySelector('.options');
+    if (!input && !options) {
+      step.classList.add('valid');
+      return true;
+    }
+    if (options) {
+      if (step.querySelector('.options span.active')) {
+        step.classList.add('valid');
+        return true;
+      }
+      return false;
+    }
+    if (input) {
+      const min = parseInt(input.minLength) || 0;
+      if (input.value.length >= min) {
+        const valueSpan = step.querySelector('.talk__form__message__value');
+        if (valueSpan) valueSpan.textContent = input.value;
+        if (input.value.length > 0 || min === 0) {
+          step.classList.add('valid');
+          return true;
+        }
+      }
+      return false;
+    }
+    return true;
+  }
+
+  function advanceStep() {
+    const step = steps[currentIndex];
+    if (!step.classList.contains('valid')) return;
+    const input = step.querySelector('input[type="text"]');
+    if (input) {
+      input.tabIndex = -1;
+      input.style.opacity = '0';
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) {
+        valueSpan.textContent = input.value;
+        valueSpan.style.borderBottom = 'none';
+      }
+    }
+    currentIndex++;
+    if (currentIndex < steps.length) {
+      activateStep(currentIndex);
+    } else {
+      form.classList.add('ready');
+      updateStepCount();
+    }
+  }
+
+  // Option pill click
+  form.querySelectorAll('.options span').forEach(option => {
+    option.addEventListener('click', () => {
+      const container = option.closest('.options');
+      const isMultiple = container.classList.contains('multiple');
+      const hiddenInput = option.closest('.talk__form__message__wrapper').querySelector('input[type="hidden"]');
+      if (isMultiple) {
+        option.classList.toggle('active');
+      } else {
+        container.querySelectorAll('span').forEach(s => s.classList.remove('active'));
+        option.classList.add('active');
+      }
+      if (hiddenInput) {
+        const selected = Array.from(container.querySelectorAll('span.active')).map(s => s.textContent.trim());
+        hiddenInput.value = selected.join(', ');
+      }
+      checkValidity(option.closest('.talk__form__message__wrapper'));
+    });
+  });
+
+  // Real-time input display
+  form.querySelectorAll('input[type="text"]').forEach(input => {
+    input.addEventListener('input', () => {
+      const step = input.closest('.talk__form__message__wrapper');
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) valueSpan.textContent = input.value;
+      checkValidity(step);
+    });
+  });
+
+  // Enter key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); advanceStep(); }
+  });
+
+  // Clickable tags
+  form.querySelectorAll('.tag').forEach(tag => {
+    tag.addEventListener('click', () => advanceStep());
+  });
+
+  // Send — submit to Command Center API + let Webflow handle email
+  sendBtn.addEventListener('click', async () => {
+    if (!form.classList.contains('ready')) return;
+    form.classList.add('sending');
+
+    const data = {
+      name: form.querySelector('input[name="name"]').value,
+      email: form.querySelector('input[name="email"]').value,
+      budget: form.querySelector('input[name="budget"]').value.trim(),
+      message: form.querySelector('input[name="message"]').value,
+    };
+
+    // Send to Command Center (async, don't block)
+    fetch(SUBMIT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).catch(err => console.error('Command Center submission error:', err));
+
+    // Submit the Webflow form natively (handles email notifications)
+    try {
+      const wfForm = form.closest('form') || form;
+      const formData = new FormData(wfForm);
+      await fetch(wfForm.getAttribute('action') || location.pathname, {
+        method: 'POST',
+        body: formData,
+      });
+    } catch (err) {
+      console.error('Webflow form submission error:', err);
+    }
+
+    // Show success
+    const success = form.querySelector('.talk__form__success');
+    success.style.opacity = '1';
+    success.style.pointerEvents = 'all';
+    form.querySelector('.talk__form__message__content').style.opacity = '0';
+  });
+
+  // ============================================
+  // WEBGL LAVA LAMP (cream metaballs on black)
+  // ============================================
+  const canvas = document.querySelector('.talk__form__blob');
+  if (canvas && canvas.getContext) {
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    if (gl) {
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      let mouseX = 0.5, mouseY = 0.5;
+      let energy = 0; // 0 = idle, 1 = active
+
+      function resize() {
+        const w = canvas.parentElement.offsetWidth;
+        const h = canvas.parentElement.offsetHeight;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+
+      const vertSrc = `
+        attribute vec2 a_pos;
+        void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+      `;
+
+      const fragSrc = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        uniform vec2 u_mouse;
+        uniform float u_energy;
+
+        vec3 mod289(vec3 x) { return x - floor(x / 289.0) * 289.0; }
+        vec2 mod289(vec2 x) { return x - floor(x / 289.0) * 289.0; }
+        vec3 permute(vec3 x) { return mod289((x * 34.0 + 1.0) * x); }
+        float snoise(vec2 v) {
+          const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+          vec2 i = floor(v + dot(v, C.yy));
+          vec2 x0 = v - i + dot(i, C.xx);
+          vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+          vec4 x12 = x0.xyxy + C.xxzz; x12.xy -= i1;
+          i = mod289(i);
+          vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+          vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+          m = m * m; m = m * m;
+          vec3 x = 2.0 * fract(p * C.www) - 1.0;
+          vec3 h = abs(x) - 0.5;
+          vec3 a0 = x - floor(x + 0.5);
+          m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+          vec3 g; g.x = a0.x * x0.x + h.x * x0.y; g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+          return 130.0 * dot(m, g);
+        }
+
+        void main() {
+          vec2 uv = gl_FragCoord.xy / u_resolution;
+          float aspect = u_resolution.x / u_resolution.y;
+          vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+          float t = u_time * (0.12 + u_energy * 0.08);
+
+          // 3 soft metaballs drifting slowly
+          float field = 0.0;
+          for (int i = 0; i < 3; i++) {
+            float fi = float(i);
+            vec2 center = vec2(
+              sin(t * (0.7 + fi * 0.3) + fi * 2.0) * 0.25,
+              cos(t * (0.5 + fi * 0.4) + fi * 1.5) * 0.2
+            );
+            // Mouse pulls the nearest blob
+            center += (u_mouse - 0.5) * vec2(aspect, 1.0) * (0.08 + u_energy * 0.06) * (1.0 - fi * 0.3);
+            float d = length(p - center);
+            field += 0.04 / (d * d + 0.01);
+          }
+
+          field = smoothstep(1.5, 4.0, field);
+
+          // Cream blobs on black — #ebe4e0 on #1a1a1a
+          vec3 cream1 = vec3(0.922, 0.894, 0.878);
+          vec3 cream2 = vec3(0.85, 0.82, 0.80);
+          float colorNoise = snoise(p * 3.0 + t) * 0.5 + 0.5;
+          vec3 blobColor = mix(cream1, cream2, colorNoise);
+
+          vec3 base = vec3(0.102, 0.102, 0.102);
+          vec3 color = mix(base, blobColor, field * (0.4 + u_energy * 0.15));
+
+          // Subtle grain
+          float grain = fract(sin(dot(uv * u_resolution, vec2(12.9898, 78.233))) * 43758.5453);
+          color += (grain - 0.5) * 0.015;
+
+          float alpha = 0.6 + field * 0.4;
+          gl_FragColor = vec4(color, alpha);
+        }
+      `;
+
+      function createShader(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return s;
+      }
+
+      const prog = gl.createProgram();
+      gl.attachShader(prog, createShader(gl.VERTEX_SHADER, vertSrc));
+      gl.attachShader(prog, createShader(gl.FRAGMENT_SHADER, fragSrc));
+      gl.linkProgram(prog);
+      gl.useProgram(prog);
+
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+      const aPos = gl.getAttribLocation(prog, 'a_pos');
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+      const uTime = gl.getUniformLocation(prog, 'u_time');
+      const uRes = gl.getUniformLocation(prog, 'u_resolution');
+      const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+      const uEnergy = gl.getUniformLocation(prog, 'u_energy');
+
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      // Mouse tracking
+      const wrapper = canvas.closest('.talk__form-wrapper');
+      wrapper.addEventListener('mousemove', (e) => {
+        const rect = wrapper.getBoundingClientRect();
+        mouseX = (e.clientX - rect.left) / rect.width;
+        mouseY = 1.0 - (e.clientY - rect.top) / rect.height; // flip Y for GL
+      });
+
+      // Energy from form interaction
+      let energyTimer;
+      form.addEventListener('focusin', () => { energy = 1; });
+      form.addEventListener('focusout', () => { energy = 0; });
+      form.addEventListener('input', () => {
+        energy = 1;
+        clearTimeout(energyTimer);
+        energyTimer = setTimeout(() => { energy = 0; }, 1500);
+      });
+      form.querySelectorAll('.options span').forEach(opt => {
+        opt.addEventListener('click', () => {
+          energy = 1;
+          clearTimeout(energyTimer);
+          energyTimer = setTimeout(() => { energy = 0; }, 1000);
+        });
+      });
+
+      let smoothEnergy = 0;
+      function render(t) {
+        smoothEnergy += (energy - smoothEnergy) * 0.05;
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.uniform1f(uTime, t * 0.001);
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+        gl.uniform2f(uMouse, mouseX, mouseY);
+        gl.uniform1f(uEnergy, smoothEnergy);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        requestAnimationFrame(render);
+      }
+      requestAnimationFrame(render);
+    }
+  }
+
+  // Initialize
+  activateStep(0);
+  updateStepCount();
+})();
+</script></div>
+
+  <!-- ============================================
+       CSS EMBED (Code Embed 2)
+       ============================================ -->
+  <div class="w-embed"><style>
+/* ============================================
+   RNR CONTACT FORM — CUSTOM EMBED STYLES
+   Webflow classes handle: .size-5, .label, .button
+   ============================================ */
+:root {
+  --outlines: rgba(216, 215, 213, 0.15);
+}
+/* --- Layout --- */
+.talk__form-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+.talk__form-sticky {
+  align-items: center;
+  display: flex;
+  width: 100%;
+  max-width: 42.5rem;
+  position: relative;
+  z-index: 2;
+}
+/* --- WebGL Canvas --- */
+.talk__form__blob {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+/* --- Form --- */
+.talk__form {
+  align-items: flex-end;
+  background-color: rgba(26, 26, 26, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 33.75rem;
+  max-height: 100%;
+  position: relative;
+  width: 100%;
+}
+@media (min-width: 600px) {
+  .talk__form { height: 37.5rem; }
+}
+@media (min-width: 1025px) {
+  .talk__form { height: 33.75rem; width: 42.5rem; }
+}
+/* --- Form Boxes --- */
+.talk__form__box {
+  display: flex;
+  justify-content: flex-end;
+  position: relative;
+  width: 100%;
+}
+.talk__form__box:nth-child(2) { flex: 1; }
+/* --- Form Lines --- */
+.talk__form__line {
+  border-left: 1px solid var(--outlines);
+  border-right: 1px solid var(--outlines);
+  overflow: clip;
+  position: relative;
+  width: 100%;
+}
+.talk__form__to { border: 1px solid var(--outlines); }
+.talk__form__send { border: 1px solid var(--outlines); }
+.talk__form__message { border-top: none; border-bottom: none; }
+.talk__form__line-wrapper {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  justify-content: space-between;
+  padding: 1.25rem;
+  width: 100%;
+}
+/* --- TO / SEND rows --- */
+.talk__form__to,
+.talk__form__send {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  text-transform: uppercase;
+}
+/* --- Message Area --- */
+.talk__form__message {
+  height: 100%;
+  overflow: clip;
+  position: absolute;
+}
+.talk__form__message__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  overflow-y: auto;
+  height: 100%;
+}
+@media (min-width: 1025px) {
+  .talk__form__message__content { width: 42.5rem; }
+}
+/* --- Message Steps --- */
+.talk__form__message__wrapper {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.625rem;
+  justify-content: flex-start;
+  max-width: 100%;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  transition: opacity 0.35s cubic-bezier(0.45, 0, 0.55, 1);
+}
+.talk__form__message__wrapper > span {
+  max-width: 100%;
+  white-space: normal;
+  word-wrap: break-word;
+}
+.talk__form__message__wrapper span:not(.talk__form__message__value):not(.selection) {
+  position: relative;
+  vertical-align: middle;
+}
+.talk__form__message__wrapper.show {
+  opacity: 0.4;
+  pointer-events: all;
+}
+.talk__form__message.focus .talk__form__message__wrapper.active {
+  opacity: 1;
+  transition-timing-function: cubic-bezier(0.5, 1, 0.89, 1);
+}
+.talk__form__message.focus .talk__form__message__wrapper.active span.options {
+  pointer-events: all;
+}
+.talk__form__message.focus .talk__form__message__wrapper.active.valid .tag {
+  scale: 1;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.talk__form.ready .talk__form__message .talk__form__message__wrapper.show {
+  opacity: 1;
+}
+/* --- Cursor blink --- */
+.talk__form__message__wrapper span.cursor {
+  animation: blink 0.65s step-start infinite;
+  background-color: currentColor;
+  display: inline-flex;
+  height: 1.625rem;
+  position: absolute;
+  translate: 0 15%;
+  visibility: hidden;
+  width: 1px;
+}
+.talk__form__message.focus .talk__form__message__wrapper.active span.cursor {
+  visibility: visible;
+}
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+/* --- Options (pill selectors) --- */
+.talk__form__message__wrapper span.options {
+  line-height: 1.75;
+  pointer-events: none;
+  vertical-align: baseline;
+}
+.talk__form__message__wrapper span.options span {
+  background-color: rgba(216, 215, 213, 0.08);
+  border-radius: 100vmax;
+  cursor: pointer;
+  font-size: 0.625rem;
+  line-height: 1.6;
+  padding: 0.625rem;
+  text-transform: uppercase;
+  transition: all 0.3s cubic-bezier(0.5, 1, 0.89, 1);
+  user-select: none;
+  white-space: nowrap;
+}
+.talk__form__message__wrapper span.options span.active {
+  background-color: currentColor;
+  color: #000;
+}
+@media (min-width: 1025px) {
+  .talk__form__message__wrapper span.options span:hover {
+    background-color: rgba(216, 215, 213, 0.2);
+  }
+}
+/* --- Tag (clickable step advance) --- */
+.tag {
+  border: 1px solid var(--outlines);
+  cursor: pointer;
+  display: inline-block;
+  font-size: 0.625rem;
+  line-height: 1.6;
+  padding: 0.625rem;
+  text-transform: uppercase;
+  scale: 0;
+  transform-origin: 0 50%;
+  transition: scale 0.25s cubic-bezier(0.36, 0, 0.66, -0.56),
+              background-color 0.35s cubic-bezier(0.5, 1, 0.89, 1),
+              color 0.35s cubic-bezier(0.5, 1, 0.89, 1);
+}
+@media (min-width: 1025px) {
+  .tag:hover {
+    background-color: currentColor;
+    color: #000;
+  }
+}
+/* --- Text Inputs --- */
+.talk__form__message input[type="text"] {
+  background: none;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.talk__form__message input[type="text"][style*="opacity: 1"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+/* --- Send Button Area --- */
+.talk__form__send-wrapper {
+  padding-bottom: 0.625rem;
+  padding-top: 0.625rem;
+}
+.talk__form__send__dots {
+  display: none;
+}
+@media (min-width: 600px) {
+  .talk__form__send__dots { display: flex; }
+}
+.talk__form__step-count {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+.talk__form__send__bt {
+  cursor: pointer;
+  opacity: 0.2;
+  pointer-events: none;
+  transition: opacity 0.35s cubic-bezier(0.45, 0, 0.55, 1);
+  width: 100%;
+}
+@media (min-width: 600px) {
+  .talk__form__send__bt { width: auto; }
+}
+.talk__form.ready .talk__form__send__bt {
+  opacity: 1;
+  pointer-events: all;
+}
+/* --- Success State --- */
+.talk__form__success {
+  align-items: flex-start;
+  border: 1px solid var(--outlines);
+  display: flex;
+  flex-direction: column;
+  height: 75%;
+  justify-content: space-between;
+  opacity: 0;
+  overflow: clip;
+  padding: 1.25rem;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+}
+/* --- Sending State --- */
+.talk__form.sending { pointer-events: none; }
+.talk__form.sending * { pointer-events: none !important; }
+.talk__form.sending .talk__form__message__content { opacity: 0.5; }
+@media (min-width: 1025px) {
+  .macgyver { display: none; }
+}
+</style></div>
+</section>

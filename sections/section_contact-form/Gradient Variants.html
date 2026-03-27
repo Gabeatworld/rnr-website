@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNR — Background Variants</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a1a; color: #d8d7d5; font-family: system-ui, sans-serif; overflow: hidden; }
+.scene { position: fixed; inset: 0; }
+.controls {
+  position: fixed; bottom: 2rem; right: 2rem; z-index: 100;
+  display: flex; flex-direction: column; gap: 0.4rem;
+}
+.controls button {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  color: #d8d7d5; padding: 0.6rem 1rem; font-size: 0.6rem;
+  font-family: monospace; text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer; transition: all 0.3s ease; text-align: left; white-space: nowrap;
+}
+.controls button:hover { background: rgba(255,255,255,0.12); }
+.controls button.active { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.35); }
+.label {
+  position: fixed; top: 2rem; left: 2rem; z-index: 100;
+  font-size: 0.6rem; font-family: monospace; text-transform: uppercase;
+  letter-spacing: 0.12em; opacity: 0.35;
+}
+.hint {
+  position: fixed; top: 2rem; right: 2rem; z-index: 100;
+  font-size: 0.55rem; font-family: monospace; text-transform: uppercase; opacity: 0.25;
+}
+
+/* Mock form for context */
+.mock-form {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 42.5rem; max-width: 90vw; z-index: 50;
+  background: rgba(26, 26, 26, 0.85);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 2rem; pointer-events: none;
+}
+.mock-form .mock-to { font-size: 0.6rem; font-family: monospace; text-transform: uppercase; opacity: 0.5; margin-bottom: 2rem; display: flex; justify-content: space-between; }
+.mock-form .mock-text { font-size: 1.4rem; font-weight: 300; opacity: 0.7; line-height: 1.4; }
+.mock-form .mock-btn { font-size: 0.6rem; font-family: monospace; text-transform: uppercase; opacity: 0.3; margin-top: 3rem; text-align: right; }
+
+/* ============================================
+   VARIANT LAYERS
+   ============================================ */
+.variant { position: absolute; inset: 0; transition: opacity 0.8s ease; opacity: 0; }
+.variant.active { opacity: 1; }
+
+/* --- 1: Frosted Orb (CSS only) --- */
+.v-orb .glow {
+  position: absolute;
+  width: 50vmax; height: 50vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 90, 50, 0.25) 0%, rgba(100, 65, 35, 0.1) 40%, transparent 70%);
+  filter: blur(80px);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  transition: transform 2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* --- 2: Mesh Gradient (CSS only) --- */
+.v-mesh .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  mix-blend-mode: screen;
+}
+.v-mesh .blob-1 {
+  width: 40vmax; height: 40vmax;
+  background: rgba(120, 75, 40, 0.2);
+  top: 30%; left: 40%;
+  animation: mesh1 12s ease-in-out infinite;
+}
+.v-mesh .blob-2 {
+  width: 35vmax; height: 35vmax;
+  background: rgba(90, 60, 45, 0.15);
+  top: 50%; left: 55%;
+  animation: mesh2 15s ease-in-out infinite;
+}
+.v-mesh .blob-3 {
+  width: 30vmax; height: 30vmax;
+  background: rgba(160, 110, 60, 0.1);
+  top: 35%; left: 45%;
+  animation: mesh3 18s ease-in-out infinite;
+}
+@keyframes mesh1 {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  33% { transform: translate(-40%, -55%) scale(1.1); }
+  66% { transform: translate(-55%, -45%) scale(0.95); }
+}
+@keyframes mesh2 {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  33% { transform: translate(-55%, -40%) scale(0.9); }
+  66% { transform: translate(-45%, -55%) scale(1.05); }
+}
+@keyframes mesh3 {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-45%, -50%) scale(1.15); }
+}
+
+/* --- 3: Grain + Glow (CSS only) --- */
+.v-grain .glow-center {
+  position: absolute;
+  width: 60vmax; height: 60vmax;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(100, 70, 35, 0.2) 0%, transparent 60%);
+  animation: grainPulse 6s ease-in-out infinite;
+}
+.v-grain .grain-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+@keyframes grainPulse {
+  0%, 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* --- 4: Heat Haze (Canvas) --- */
+.v-haze canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* --- 5: Soft Spotlight (CSS only) --- */
+.v-spot .spot {
+  position: absolute;
+  width: 35vmax; height: 50vmax;
+  top: -10%; left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(130, 90, 45, 0.18) 0%, rgba(100, 70, 35, 0.08) 30%, transparent 65%);
+  filter: blur(40px);
+  transition: transform 3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.v-spot .spot-reflection {
+  position: absolute;
+  width: 80vw; height: 20vh;
+  bottom: 10%; left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(120, 85, 45, 0.06) 0%, transparent 70%);
+  filter: blur(60px);
+}
+
+/* --- 6: Lava Lamp (Canvas) --- */
+.v-lava canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div class="label" id="variantLabel">1 — Frosted Orb</div>
+<div class="hint">Move mouse slowly</div>
+
+<div class="scene">
+  <!-- 1: Frosted Orb -->
+  <div class="variant v-orb active" id="v0">
+    <div class="glow" id="orbGlow"></div>
+  </div>
+
+  <!-- 2: Mesh Gradient -->
+  <div class="variant v-mesh" id="v1">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <!-- 3: Grain + Glow -->
+  <div class="variant v-grain" id="v2">
+    <div class="glow-center"></div>
+    <div class="grain-overlay"></div>
+  </div>
+
+  <!-- 4: Heat Haze -->
+  <div class="variant v-haze" id="v3">
+    <canvas id="hazeCanvas"></canvas>
+  </div>
+
+  <!-- 5: Soft Spotlight -->
+  <div class="variant v-spot" id="v4">
+    <div class="spot" id="spotLight"></div>
+    <div class="spot-reflection"></div>
+  </div>
+
+  <!-- 6: Lava Lamp -->
+  <div class="variant v-lava" id="v5">
+    <canvas id="lavaCanvas"></canvas>
+  </div>
+</div>
+
+<!-- Mock form overlay -->
+<div class="mock-form">
+  <div class="mock-to"><span>TO: GABE & CARO</span><span>HELLO@RNR.COOL</span></div>
+  <div class="mock-text">Hey, we're glad you're here. Share a few details and we'll get back to you with a ballpark.</div>
+  <div class="mock-btn">SEND REQUEST</div>
+</div>
+
+<div class="controls">
+  <button class="active" onclick="setVariant(0)">1 — Frosted Orb</button>
+  <button onclick="setVariant(1)">2 — Mesh Gradient</button>
+  <button onclick="setVariant(2)">3 — Grain + Glow</button>
+  <button onclick="setVariant(3)">4 — Heat Haze</button>
+  <button onclick="setVariant(4)">5 — Soft Spotlight</button>
+  <button onclick="setVariant(5)">6 — Lava Lamp</button>
+</div>
+
+<script>
+const names = ['Frosted Orb', 'Mesh Gradient', 'Grain + Glow', 'Heat Haze', 'Soft Spotlight', 'Lava Lamp'];
+let current = 0;
+let mx = 0.5, my = 0.5, smx = 0.5, smy = 0.5;
+
+document.addEventListener('mousemove', (e) => {
+  mx = e.clientX / window.innerWidth;
+  my = e.clientY / window.innerHeight;
+});
+
+function setVariant(v) {
+  current = v;
+  document.querySelectorAll('.variant').forEach((el, i) => el.classList.toggle('active', i === v));
+  document.querySelectorAll('.controls button').forEach((btn, i) => btn.classList.toggle('active', i === v));
+  document.getElementById('variantLabel').textContent = (v + 1) + ' — ' + names[v];
+}
+
+// ============================================
+// 1: FROSTED ORB — single soft circle follows mouse
+// ============================================
+const orbGlow = document.getElementById('orbGlow');
+
+// ============================================
+// 4: HEAT HAZE — barely-there warping, like hot air
+// ============================================
+const hazeCanvas = document.getElementById('hazeCanvas');
+const hCtx = hazeCanvas.getContext('2d');
+function resizeHaze() {
+  hazeCanvas.width = window.innerWidth;
+  hazeCanvas.height = window.innerHeight;
+}
+resizeHaze();
+window.addEventListener('resize', resizeHaze);
+
+// ============================================
+// 5: SOFT SPOTLIGHT — follows mouse from top
+// ============================================
+const spotLight = document.getElementById('spotLight');
+
+// ============================================
+// 6: LAVA LAMP — WebGL soft metaballs
+// ============================================
+const lavaCanvas = document.getElementById('lavaCanvas');
+const gl = lavaCanvas.getContext('webgl2') || lavaCanvas.getContext('webgl');
+const dpr = Math.min(window.devicePixelRatio, 2);
+
+function resizeLava() {
+  lavaCanvas.width = window.innerWidth * dpr;
+  lavaCanvas.height = window.innerHeight * dpr;
+  if (gl) gl.viewport(0, 0, lavaCanvas.width, lavaCanvas.height);
+}
+resizeLava();
+window.addEventListener('resize', resizeLava);
+
+let lavaProg;
+if (gl) {
+  const vSrc = `attribute vec2 a_pos; void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
+  const fSrc = `
+    precision highp float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform vec2 u_mouse;
+
+    vec3 mod289(vec3 x) { return x - floor(x / 289.0) * 289.0; }
+    vec2 mod289(vec2 x) { return x - floor(x / 289.0) * 289.0; }
+    vec3 permute(vec3 x) { return mod289((x * 34.0 + 1.0) * x); }
+    float snoise(vec2 v) {
+      const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+      vec2 i = floor(v + dot(v, C.yy));
+      vec2 x0 = v - i + dot(i, C.xx);
+      vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+      vec4 x12 = x0.xyxy + C.xxzz; x12.xy -= i1;
+      i = mod289(i);
+      vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+      vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+      m = m * m; m = m * m;
+      vec3 x = 2.0 * fract(p * C.www) - 1.0;
+      vec3 h = abs(x) - 0.5;
+      vec3 a0 = x - floor(x + 0.5);
+      m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+      vec3 g; g.x = a0.x * x0.x + h.x * x0.y; g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+      return 130.0 * dot(m, g);
+    }
+
+    void main() {
+      vec2 uv = gl_FragCoord.xy / u_resolution;
+      float aspect = u_resolution.x / u_resolution.y;
+      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+      float t = u_time * 0.12;
+
+      // 3 soft metaballs drifting slowly
+      float field = 0.0;
+      for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        vec2 center = vec2(
+          sin(t * (0.7 + fi * 0.3) + fi * 2.0) * 0.25,
+          cos(t * (0.5 + fi * 0.4) + fi * 1.5) * 0.2
+        );
+        // Mouse pulls the nearest blob
+        center += (u_mouse - 0.5) * vec2(aspect, 1.0) * 0.08 * (1.0 - fi * 0.3);
+        float d = length(p - center);
+        field += 0.04 / (d * d + 0.01);
+      }
+
+      field = smoothstep(1.5, 4.0, field);
+
+      // Earthy colors
+      vec3 col1 = vec3(0.45, 0.28, 0.14);
+      vec3 col2 = vec3(0.3, 0.2, 0.12);
+      float colorNoise = snoise(p * 3.0 + t) * 0.5 + 0.5;
+      vec3 blobColor = mix(col1, col2, colorNoise);
+
+      vec3 base = vec3(0.1, 0.085, 0.07);
+      vec3 color = mix(base, blobColor, field * 0.5);
+
+      // Subtle grain
+      float grain = fract(sin(dot(uv * u_resolution, vec2(12.9898, 78.233))) * 43758.5453);
+      color += (grain - 0.5) * 0.015;
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  function mkShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+    return s;
+  }
+
+  lavaProg = gl.createProgram();
+  gl.attachShader(lavaProg, mkShader(gl.VERTEX_SHADER, vSrc));
+  gl.attachShader(lavaProg, mkShader(gl.FRAGMENT_SHADER, fSrc));
+  gl.linkProgram(lavaProg);
+  gl.useProgram(lavaProg);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(lavaProg, 'a_pos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+}
+
+// ============================================
+// MAIN LOOP
+// ============================================
+function tick(t) {
+  const ts = t * 0.001;
+
+  // Smooth mouse (heavy lerp = premium)
+  smx += (mx - smx) * 0.02;
+  smy += (my - smy) * 0.02;
+
+  // 1: Frosted Orb
+  const ox = smx * 100;
+  const oy = smy * 100;
+  orbGlow.style.transform = `translate(calc(-50% + ${(smx - 0.5) * 15}vw), calc(-50% + ${(smy - 0.5) * 15}vh))`;
+
+  // 4: Heat Haze
+  if (current === 3) {
+    const w = hazeCanvas.width, h = hazeCanvas.height;
+    hCtx.clearRect(0, 0, w, h);
+
+    // Barely visible warping lines
+    hCtx.globalAlpha = 0.03;
+    for (let i = 0; i < 60; i++) {
+      const y = (i / 60) * h;
+      const offset = Math.sin(y * 0.008 + ts * 0.3) * 20 + Math.sin(y * 0.003 + ts * 0.15) * 40;
+      const mouseInfluence = Math.exp(-Math.pow((y / h - smy) * 3, 2)) * 30;
+
+      hCtx.beginPath();
+      hCtx.moveTo(0, y);
+      hCtx.quadraticCurveTo(w * 0.5 + offset + mouseInfluence, y + Math.sin(ts * 0.2 + i) * 3, w, y);
+      hCtx.strokeStyle = `rgba(160, 110, 60, ${0.3 + Math.sin(ts * 0.1 + i * 0.2) * 0.15})`;
+      hCtx.lineWidth = 1.5;
+      hCtx.stroke();
+    }
+
+    // Center warmth
+    hCtx.globalAlpha = 0.06;
+    const grd = hCtx.createRadialGradient(w * smx, h * smy, 0, w * 0.5, h * 0.5, w * 0.5);
+    grd.addColorStop(0, 'rgba(140, 95, 50, 0.3)');
+    grd.addColorStop(1, 'transparent');
+    hCtx.fillStyle = grd;
+    hCtx.fillRect(0, 0, w, h);
+    hCtx.globalAlpha = 1;
+  }
+
+  // 5: Soft Spotlight
+  spotLight.style.transform = `translateX(calc(-50% + ${(smx - 0.5) * 20}vw))`;
+
+  // 6: Lava Lamp
+  if (current === 5 && gl) {
+    gl.useProgram(lavaProg);
+    gl.uniform1f(gl.getUniformLocation(lavaProg, 'u_time'), ts);
+    gl.uniform2f(gl.getUniformLocation(lavaProg, 'u_resolution'), lavaCanvas.width, lavaCanvas.height);
+    gl.uniform2f(gl.getUniformLocation(lavaProg, 'u_mouse'), smx, 1.0 - smy);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

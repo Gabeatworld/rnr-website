@@ -1,0 +1,777 @@
+<script>
+
+/* ── core ── */
+/* ============================================================
+   RNR Home — Module Orchestrator
+   ============================================================
+   Single DOMContentLoaded. Queries DOM once. Passes shared
+   context to every registered module in order.
+   ============================================================ */
+
+(function () {
+  'use strict';
+
+  const RNR = (window.RNR = window.RNR || {});
+
+  // ── Module registry ──────────────────────────────────────
+  const _modules = [];
+
+  RNR.register = function (name, initFn, priority) {
+    _modules.push({ name, initFn, priority: priority || 0 });
+  };
+
+  // ── Boot ─────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    // Shared DOM refs — queried once, used everywhere
+    const container = document.querySelector('.feed-section');
+    const wrapper   = document.querySelector('.feed-wrapper');
+    const projects  = wrapper
+      ? Array.from(wrapper.querySelectorAll('.feed-project'))
+      : [];
+
+    const shared = {
+      container,
+      wrapper,
+      projects,
+      activeIndex: -1,
+
+      // Shared setters so modules stay in sync
+      setActiveIndex(i) { shared.activeIndex = i; },
+      getActiveIndex()  { return shared.activeIndex; },
+    };
+
+    // Sort by priority (lower runs first) then init in order
+    _modules.sort((a, b) => a.priority - b.priority);
+
+    _modules.forEach((mod) => {
+      try {
+        const api = mod.initFn(shared);
+        if (api) RNR[mod.name] = api;
+      } catch (err) {
+        console.error(`[RNR] Module "${mod.name}" failed to init:`, err);
+      }
+    });
+
+    console.log(
+      `[RNR] ${_modules.length} module(s) initialised:`,
+      _modules.map((m) => m.name).join(', ')
+    );
+  });
+})();
+
+
+/* ── feed-animation.js ── */
+/* ============================================================
+   Module: feedAnimation
+   Scroll-triggered text blur reveals for feed projects.
+   ============================================================ */
+
+RNR.register('feedAnimation', function (shared) {
+  const { container, wrapper, projects } = shared;
+
+  if (!container || !wrapper || !projects.length || !window.gsap || !window.SplitText) {
+    console.warn('[feedAnimation] Missing required elements or libraries');
+    return null;
+  }
+
+  gsap.registerPlugin(ScrollTrigger, SplitText);
+
+  // ── Config ───────────────────────────────────────────────
+  const TEXT = {
+    duration:  1.1,
+    stagger:   0.2,
+    blurStart: 10,
+    delay:     0.05,
+    ease:      'power2.out',
+  };
+
+  // ── State ────────────────────────────────────────────────
+  const splitInstances = [];
+  const textElements   = [];
+
+  // ── Setup: split text once ───────────────────────────────
+  projects.forEach((slide) => {
+    const title       = slide.querySelector('.feed-title');
+    const category    = slide.querySelector('.feed-category');
+    const description = slide.querySelector('.feed-project-description');
+    const words       = [];
+
+    [title, category, description].forEach((el) => {
+      if (!el || !el.textContent.trim()) return;
+      const split = new SplitText(el, { type: 'words', wordsClass: 'word' });
+      splitInstances.push(split);
+      words.push(...split.words);
+    });
+
+    textElements.push({ words });
+
+    if (words.length) {
+      gsap.set(words, {
+        opacity: 0,
+        filter: `blur(${TEXT.blurStart}px)`,
+        willChange: 'transform, opacity, filter',
+      });
+    }
+  });
+
+  // ── Text animations ──────────────────────────────────────
+  function animateIn(index) {
+    const { words } = textElements[index];
+    if (!words.length) return;
+
+    gsap.killTweensOf(words);
+    gsap.set(words, { opacity: 0, filter: `blur(${TEXT.blurStart}px)` });
+    gsap.to(words, {
+      opacity: 1,
+      filter: 'blur(0px)',
+      duration: TEXT.duration,
+      delay: TEXT.delay,
+      stagger: { amount: TEXT.stagger },
+      ease: TEXT.ease,
+      onComplete() {
+        gsap.set(this.targets(), { clearProps: 'willChange,filter' });
+      },
+    });
+  }
+
+  function animateOut(index) {
+    const { words } = textElements[index];
+    if (!words.length) return;
+
+    gsap.killTweensOf(words);
+    gsap.to(words, {
+      opacity: 0,
+      filter: `blur(${TEXT.blurStart}px)`,
+      duration: 0.3,
+      stagger: 0.02,
+      ease: 'power2.in',
+    });
+  }
+
+  function hideAll() {
+    textElements.forEach(({ words }) => {
+      if (!words.length) return;
+      gsap.killTweensOf(words);
+      gsap.set(words, { opacity: 0, filter: `blur(${TEXT.blurStart}px)` });
+    });
+    projects.forEach((s) => s.classList.remove('is-active'));
+    shared.setActiveIndex(-1);
+  }
+
+  // ── Activate slide ───────────────────────────────────────
+  function activateSlide(index) {
+    const prev = shared.getActiveIndex();
+    if (prev === index) return;
+
+    if (prev >= 0) {
+      projects[prev].classList.remove('is-active');
+      animateOut(prev);
+    }
+
+    shared.setActiveIndex(index);
+    projects[index].classList.add('is-active');
+    animateIn(index);
+
+    // Tell slider to restart (direct call, no MutationObserver needed)
+    if (RNR.feedSlider) {
+      RNR.feedSlider.restartSlider(projects[index]);
+    }
+  }
+
+  // ── ScrollTriggers ───────────────────────────────────────
+  const lastIndex = projects.length - 1;
+
+  projects.forEach((slide, i) => {
+    ScrollTrigger.create({
+      trigger: slide,
+      start: 'top center',
+      end: i === lastIndex ? 'bottom 25%' : 'bottom center',
+      onEnter:     () => activateSlide(i),
+      onEnterBack: () => activateSlide(i),
+    });
+  });
+
+  ScrollTrigger.create({
+    trigger: container,
+    start: 'top bottom',
+    end: 'bottom top',
+    onLeave:     () => hideAll(),
+    onLeaveBack: () => hideAll(),
+  });
+
+  // ── Public API ───────────────────────────────────────────
+  return { activateSlide, hideAll };
+
+}, 0); // priority 0 — runs first
+
+
+/* ── feed-slider.js ── */
+/* ============================================================
+   Module: feedSlider
+   Inner slide navigation, dot nav, video control.
+   ============================================================ */
+
+RNR.register('feedSlider', function (shared) {
+  const { wrapper, projects } = shared;
+
+  if (!wrapper || !projects.length || !window.gsap) {
+    console.warn('[feedSlider] Missing required elements or GSAP');
+    return null;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────
+  function getSlideItems(project) {
+    const list = project.querySelector('.feed-inner-slider-list');
+    if (!list) return [];
+    return Array.from(list.querySelectorAll('.feed-slider-slide:not(.w-condition-invisible)'));
+  }
+
+  // ── Video control ────────────────────────────────────────
+  function playVideo(video) {
+    if (!video || video.tagName !== 'VIDEO') return;
+    if (video.preload === 'none' && video.readyState === 0) {
+      video.preload = 'auto';
+      video.load();
+    }
+    const p = video.play();
+    if (p !== undefined) p.catch(() => {});
+  }
+
+  function pauseVideo(video) {
+    if (!video || video.tagName !== 'VIDEO') return;
+    video.pause();
+  }
+
+  function playVisibleVideo(project) {
+    const idx   = parseInt(project.dataset.innerIndex || '0', 10);
+    const items = getSlideItems(project);
+    const slide = items[idx];
+    if (!slide) return;
+    const v = slide.querySelector('video.feed-video');
+    if (v) playVideo(v);
+  }
+
+  function pauseAllVideos(project) {
+    project.querySelectorAll('video.feed-video').forEach((v) => pauseVideo(v));
+  }
+
+  function handleSlideVideoTransition(project, fromIdx, toIdx) {
+    const items = getSlideItems(project);
+    const fromV = items[fromIdx]?.querySelector('video.feed-video');
+    const toV   = items[toIdx]?.querySelector('video.feed-video');
+    if (fromV) pauseVideo(fromV);
+    if (toV)   playVideo(toV);
+  }
+
+  // ── Nav visibility ───────────────────────────────────────
+  function updateNavVisibility(project, currentIndex, totalItems) {
+    const sliderWrapper = project.querySelector('.feed-project-slider');
+    if (!sliderWrapper) return;
+
+    const prevZone = sliderWrapper.querySelector('.slide-prev');
+    const nextZone = sliderWrapper.querySelector('.slide-next');
+    const isFirst  = currentIndex === 0;
+    const isLast   = currentIndex === totalItems - 1;
+
+    if (prevZone) prevZone.style.display = (isFirst || isLast) ? 'none' : 'block';
+    if (nextZone) nextZone.style.display = isLast ? 'none' : 'block';
+
+    if (nextZone && !isLast) {
+      if (isFirst) {
+        nextZone.style.left  = '0';
+        nextZone.style.width = '100%';
+      } else {
+        nextZone.style.left  = '';
+        nextZone.style.width = '';
+      }
+    }
+  }
+
+  // ── Setup per project ────────────────────────────────────
+  projects.forEach((project, i) => {
+    project.dataset.index      = i;
+    project.dataset.innerIndex = 0;
+
+    const sliderWrapper = project.querySelector('.feed-project-slider');
+    const sliderList    = project.querySelector('.feed-inner-slider-list');
+    if (!sliderList) return;
+
+    const slideItems = sliderList.querySelectorAll('.feed-slider-slide:not(.w-condition-invisible)');
+    if (slideItems.length <= 1) return;
+
+    // Dots
+    const dotsNav = project.querySelector('.feed-inner-slider-nav');
+    if (dotsNav) {
+      const existing = dotsNav.querySelectorAll('.feed-inner-slider-dot');
+      for (let d = existing.length; d < slideItems.length; d++) {
+        const dot = document.createElement('div');
+        dot.className    = 'feed-inner-slider-dot';
+        dot.dataset.index = d;
+        dotsNav.appendChild(dot);
+      }
+      const first = dotsNav.querySelector('.feed-inner-slider-dot');
+      if (first) first.classList.add('active');
+    }
+
+    // Initial nav state
+    const prevZone = sliderWrapper?.querySelector('.slide-prev');
+    const nextZone = sliderWrapper?.querySelector('.slide-next');
+    if (prevZone) prevZone.style.display = 'none';
+    if (nextZone) { nextZone.style.left = '0'; nextZone.style.width = '100%'; }
+  });
+
+  // ── Navigation ───────────────────────────────────────────
+  function navigateInnerSlider(project, direction) {
+    const sliderList = project.querySelector('.feed-inner-slider-list');
+    if (!sliderList) return;
+
+    const slideItems = getSlideItems(project);
+    const dots       = project.querySelectorAll('.feed-inner-slider-dot');
+    if (slideItems.length <= 1 || gsap.isTweening(sliderList)) return;
+
+    let current = parseInt(project.dataset.innerIndex || '0', 10);
+    let next    = current + direction;
+
+    if (next < 0) next = 0;
+    if (next >= slideItems.length) next = slideItems.length - 1;
+    if (next === current) return;
+
+    const w = slideItems[0]?.offsetWidth || 0;
+    gsap.to(sliderList, { x: -w * next, duration: 0.55, ease: 'power3.inOut' });
+
+    if (dots[current]) dots[current].classList.remove('active');
+    if (dots[next])    dots[next].classList.add('active');
+    project.dataset.innerIndex = next;
+
+    handleSlideVideoTransition(project, current, next);
+    updateNavVisibility(project, next, slideItems.length);
+  }
+
+  function navigateToIndex(project, targetIndex) {
+    const sliderList = project.querySelector('.feed-inner-slider-list');
+    if (!sliderList) return;
+
+    const slideItems = getSlideItems(project);
+    const dots       = project.querySelectorAll('.feed-inner-slider-dot');
+    if (slideItems.length <= 1 || gsap.isTweening(sliderList)) return;
+
+    const current = parseInt(project.dataset.innerIndex || '0', 10);
+    if (targetIndex === current) return;
+
+    const w = slideItems[0]?.offsetWidth || 0;
+    gsap.to(sliderList, { x: -w * targetIndex, duration: 0.55, ease: 'power3.inOut' });
+
+    if (dots[current])     dots[current].classList.remove('active');
+    if (dots[targetIndex]) dots[targetIndex].classList.add('active');
+    project.dataset.innerIndex = targetIndex;
+
+    handleSlideVideoTransition(project, current, targetIndex);
+    updateNavVisibility(project, targetIndex, slideItems.length);
+  }
+
+  function restartSlider(project) {
+    const current = parseInt(project.dataset.innerIndex || '0', 10);
+    navigateToIndex(project, 0);
+    if (current === 0) playVisibleVideo(project);
+  }
+
+  // ── Active project watcher (direct, no MutationObserver) ─
+  // feedAnimation calls restartSlider directly via the public API.
+  // We still need to handle video play/pause on activation though.
+  // Listen for class changes on projects to manage video state.
+
+  function onProjectActivated(project) {
+    playVisibleVideo(project);
+  }
+
+  function onProjectDeactivated(project) {
+    pauseAllVideos(project);
+  }
+
+  // Lightweight observer — only for video play/pause
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName !== 'class') return;
+      const project = mutation.target;
+      const isActive = project.classList.contains('is-active');
+
+      if (isActive) {
+        onProjectActivated(project);
+      } else {
+        onProjectDeactivated(project);
+      }
+    });
+  });
+
+  projects.forEach((project) => {
+    observer.observe(project, { attributes: true, attributeFilter: ['class'] });
+  });
+
+  // ── Events (delegated) ──────────────────────────────────
+  // Hover: preload adjacent slide video
+  wrapper.addEventListener('mouseenter', (e) => {
+    const nextZone = e.target.closest('.slide-next');
+    const prevZone = e.target.closest('.slide-prev');
+    if (!nextZone && !prevZone) return;
+
+    const project = e.target.closest('.feed-project');
+    if (!project) return;
+
+    const current = parseInt(project.dataset.innerIndex || '0', 10);
+    const items   = getSlideItems(project);
+    const target  = nextZone ? current + 1 : current - 1;
+
+    if (target >= 0 && target < items.length) {
+      const v = items[target]?.querySelector('video.feed-video');
+      if (v && v.preload === 'none' && v.readyState === 0) {
+        v.preload = 'auto';
+        v.load();
+      }
+    }
+  }, true);
+
+  // Click
+  wrapper.addEventListener('click', (e) => {
+    const project = e.target.closest('.feed-project');
+    if (!project) return;
+
+    if (e.target.closest('.slide-restart')) {
+      e.preventDefault(); e.stopPropagation();
+      restartSlider(project);
+      return;
+    }
+    if (e.target.closest('.slide-next')) {
+      e.preventDefault(); e.stopPropagation();
+      navigateInnerSlider(project, 1);
+      return;
+    }
+    if (e.target.closest('.slide-prev')) {
+      e.preventDefault(); e.stopPropagation();
+      navigateInnerSlider(project, -1);
+      return;
+    }
+
+    const dot = e.target.closest('.feed-inner-slider-dot');
+    if (dot) {
+      e.preventDefault(); e.stopPropagation();
+      navigateToIndex(project, parseInt(dot.dataset.index, 10));
+      return;
+    }
+
+    const caseSlide = e.target.closest('.feed-view-case');
+    const caseLink  = e.target.closest('.feed-view-case a');
+    if (caseSlide && !caseLink) {
+      e.preventDefault();
+      navigateInnerSlider(project, -1);
+    }
+  });
+
+  // ── Public API ───────────────────────────────────────────
+  return { restartSlider, navigateInnerSlider, navigateToIndex };
+
+}, 1); // priority 1 — runs after feedAnimation
+
+
+/* ── image-trail.js ── */
+/* ============================================================
+   Module: imageTrail
+   Snapshot section — mouse-follow image trail effect.
+   Active only while .section_snapshot is in viewport.
+   Positions are viewport-relative so scroll can't desync.
+   ============================================================ */
+
+RNR.register('imageTrail', function (/* shared */) {
+  const section   = document.querySelector('.section_snapshot');
+  const container = document.querySelector('.trail_wrap');
+  if (!section || !container || !window.gsap) return null;
+
+  // ── Math utils ───────────────────────────────────────────
+  const lerp     = (a, b, n) => (1 - n) * a + n * b;
+  const distance = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
+
+  // ── Mouse position — viewport-relative to container ──────
+  let mousePos     = { x: 0, y: 0 };
+  let cacheMousePos = { x: 0, y: 0 };
+  let lastMousePos  = { x: 0, y: 0 };
+
+  section.addEventListener('mousemove', (ev) => {
+    const rect = container.getBoundingClientRect();
+    mousePos = {
+      x: ev.clientX - rect.left,
+      y: ev.clientY - rect.top,
+    };
+  });
+
+  // ── Image items ──────────────────────────────────────────
+  class ImageItem {
+    constructor(el) {
+      this.el = el;
+      this.width  = el.offsetWidth;
+      this.height = el.offsetHeight;
+      gsap.set(el, { scale: 0, x: 0, y: 0, opacity: 1 });
+      window.addEventListener('resize', () => this.resize());
+    }
+    resize() {
+      gsap.set(this.el, { scale: 0, x: 0, y: 0 });
+      this.width  = this.el.offsetWidth;
+      this.height = this.el.offsetHeight;
+    }
+    isActive() {
+      return gsap.isTweening(this.el) || this.el.style.transform.indexOf('scale(0)') === -1;
+    }
+  }
+
+  const images = Array.from(container.querySelectorAll('.trail_scale-img')).map((el) => new ImageItem(el));
+  if (images.length === 0) return null;
+
+  let imgPosition = 0;
+  let zIndexVal   = 1;
+  const threshold = 100;
+
+  // ── Visibility gating (pause when offscreen) ─────────────
+  let isVisible = false;
+  let rafId     = null;
+
+  const visObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        isVisible = entry.isIntersecting;
+        if (isVisible && !rafId) {
+          rafId = requestAnimationFrame(render);
+        }
+      });
+    },
+    { threshold: 0 }
+  );
+  visObserver.observe(section);
+
+  // ── Render loop ──────────────────────────────────────────
+  function render() {
+    if (!isVisible) { rafId = null; return; }
+
+    const dist = distance(mousePos.x, mousePos.y, lastMousePos.x, lastMousePos.y);
+
+    cacheMousePos.x = lerp(cacheMousePos.x || mousePos.x, mousePos.x, 0.1);
+    cacheMousePos.y = lerp(cacheMousePos.y || mousePos.y, mousePos.y, 0.1);
+
+    if (dist > threshold) {
+      showNextImage();
+      zIndexVal++;
+      imgPosition = imgPosition < images.length - 1 ? imgPosition + 1 : 0;
+      lastMousePos = { ...mousePos };
+    }
+
+    // Reset z-index when idle
+    let idle = true;
+    for (const img of images) {
+      if (img.isActive()) { idle = false; break; }
+    }
+    if (idle && zIndexVal !== 1) zIndexVal = 1;
+
+    rafId = requestAnimationFrame(render);
+  }
+
+  function showNextImage() {
+    const img = images[imgPosition];
+    if (!img) return;
+
+    // Use offsetWidth/Height (layout size, not scroll-dependent)
+    const hw = img.width / 2;
+    const hh = img.height / 2;
+
+    gsap.killTweensOf(img.el);
+    gsap.timeline()
+      .set(img.el, {
+        scale: 0,
+        zIndex: zIndexVal,
+        x: cacheMousePos.x - hw,
+        y: cacheMousePos.y - hh,
+        immediateRender: true,
+      })
+      .to(img.el, {
+        duration: 0.6,
+        ease: 'expo.out',
+        scale: 1,
+        x: mousePos.x - hw,
+        y: mousePos.y - hh,
+      }, 0)
+      .to(img.el, {
+        duration: 0.8,
+        ease: 'power2.in',
+        scale: 0,
+      }, 0.5);
+  }
+
+  // ── Preload images then start ────────────────────────────
+  const preload = () => new Promise((resolve) => {
+    if (typeof imagesLoaded !== 'undefined') {
+      imagesLoaded(document.querySelectorAll('.trail_scale-img'), resolve);
+    } else {
+      resolve();
+    }
+  });
+
+  preload().then(() => {
+    if (isVisible && !rafId) {
+      rafId = requestAnimationFrame(render);
+    }
+  });
+
+  return null;
+
+}, 10); // priority 10 — independent, runs last
+
+
+/* ── service-hover.js ── */
+/* ============================================================
+   Module: serviceHover
+   Service item hover — text color, image scale, BG fade,
+   mouse-driven move + rotate on the image wrap.
+   Replaces 4 Webflow interactions with one script.
+   ============================================================ */
+
+RNR.register('serviceHover', function (/* shared */) {
+  const serviceList = document.querySelector('.service-list');
+  if (!serviceList || !window.gsap) return null;
+
+  const items  = Array.from(serviceList.querySelectorAll('.service-item'));
+  const bgWrap = document.querySelector('.services-bg');
+  const bgImages = bgWrap
+    ? Array.from(bgWrap.querySelectorAll('.service-bg-image'))
+    : [];
+
+  if (!items.length) return null;
+
+  // ── Config ───────────────────────────────────────────────
+  const MOVE_RANGE   = 150;  // px
+  const ROTATE_RANGE = 4;    // degrees
+  const HOVER_IN     = { duration: 0.3, ease: 'circ.out' };
+  const HOVER_OUT    = { duration: 0.3, ease: 'power2.in' };
+
+  // ── State ────────────────────────────────────────────────
+  let activeItem  = null;
+  let mouseX      = 0;
+  let mouseY      = 0;
+  let currentX   = 0;
+  let currentY   = 0;
+  let currentRot = 0;
+  let rafId       = null;
+
+  // ── Initial states ───────────────────────────────────────
+  items.forEach((item) => {
+    const imgWrap = item.querySelector('.image-wrap-service');
+    if (imgWrap) {
+      gsap.set(imgWrap, { scale: 0, opacity: 0 });
+    }
+  });
+
+  bgImages.forEach((bg) => {
+    gsap.set(bg, { opacity: 0 });
+  });
+
+  // ── Mouse tracking loop ──────────────────────────────────
+  function trackMouse() {
+    if (!activeItem) { rafId = null; return; }
+
+    const imgWrap = activeItem.querySelector('.image-wrap-service');
+    if (!imgWrap) { rafId = null; return; }
+
+    const rect = activeItem.getBoundingClientRect();
+    // Normalise mouse X within item: -1 to 1
+    const nx = ((mouseX - rect.left) / rect.width) * 2 - 1;
+
+    const targetX   = nx * MOVE_RANGE;
+    const targetRot = nx * ROTATE_RANGE;
+
+    // Lerp for smoothness
+    currentX   += (targetX   - currentX)   * 0.12;
+    currentRot += (targetRot - currentRot) * 0.12;
+
+    gsap.set(imgWrap, {
+      x: currentX,
+      rotation: currentRot,
+    });
+
+    rafId = requestAnimationFrame(trackMouse);
+  }
+
+  function startTracking() {
+    if (!rafId) rafId = requestAnimationFrame(trackMouse);
+  }
+
+  function stopTracking() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  // ── Hover in ─────────────────────────────────────────────
+  function activate(item, index) {
+    if (activeItem === item) return;
+    if (activeItem) deactivate();
+
+    activeItem = item;
+
+    // Reset lerp values
+    currentX = 0; currentY = 0; currentRot = 0;
+
+    // All hover-in animations — same duration + ease
+    gsap.to(serviceList, { color: 'white', ...HOVER_IN });
+    item.classList.add('is-active');
+
+    const imgWrap = item.querySelector('.image-wrap-service');
+    if (imgWrap) {
+      gsap.killTweensOf(imgWrap);
+      gsap.to(imgWrap, { scale: 1, opacity: 1, ...HOVER_IN });
+    }
+
+    const bg = bgImages[index];
+    if (bg) {
+      gsap.killTweensOf(bg);
+      gsap.to(bg, { opacity: 1, ...HOVER_IN });
+    }
+
+    startTracking();
+  }
+
+  // ── Hover out ────────────────────────────────────────────
+  function deactivate() {
+    if (!activeItem) return;
+
+    const item  = activeItem;
+    const index = items.indexOf(item);
+
+    stopTracking();
+    activeItem = null;
+
+    // All hover-out animations — same duration + ease
+    gsap.to(serviceList, { color: 'var(--_theme---text)', ...HOVER_OUT });
+    item.classList.remove('is-active');
+
+    const imgWrap = item.querySelector('.image-wrap-service');
+    if (imgWrap) {
+      gsap.killTweensOf(imgWrap);
+      gsap.to(imgWrap, { scale: 0, opacity: 0, x: 0, rotation: 0, ...HOVER_OUT });
+    }
+
+    const bg = bgImages[index];
+    if (bg) {
+      gsap.killTweensOf(bg);
+      gsap.to(bg, { opacity: 0, ...HOVER_OUT });
+    }
+  }
+
+  // ── Events ───────────────────────────────────────────────
+  items.forEach((item, i) => {
+    item.addEventListener('mouseenter', () => activate(item, i));
+    item.addEventListener('mouseleave', () => deactivate());
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+  });
+
+  return { activate, deactivate };
+
+}, 5); // priority 5
+
+</script>

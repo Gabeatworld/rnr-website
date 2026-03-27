@@ -1,0 +1,60 @@
+<!-- Homepage Intro — controls overlay + hero reveal
+     Code embed inside section_hero in Webflow (after Hero Reveal)
+     Intro always plays on homepage load -->
+
+<style>
+.intro-overlay {
+  display: flex;
+  pointer-events: none;
+  z-index: 9999;
+}
+html.hero-ready .intro-overlay {
+  display: none;
+}
+html:not(.hero-ready) .nav_logo,
+html:not(.hero-ready) .nav_link {
+  opacity: 0;
+}
+</style>
+
+<script>
+history.scrollRestoration = 'manual';
+window.scrollTo(0, 0);
+
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.querySelector('.intro-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    overlay.style.opacity = '1';
+  }
+});
+
+// Listen for phrase completion, then trigger hero reveal
+function onPhraseComplete() {
+  document.documentElement.classList.add('gsap-loaded');
+  if (typeof revealHeroElements === 'function') {
+    revealHeroElements();
+  }
+}
+window.addEventListener('intro-phrase-complete', onPhraseComplete);
+
+// If phrase already finished before this script loaded
+if (window._introPhraseComplete) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onPhraseComplete);
+  } else {
+    onPhraseComplete();
+  }
+}
+
+// BFCache handler
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    document.documentElement.classList.remove('gsap-loaded', 'animations-ready', 'hero-ready', 'has-intro');
+    document.body.classList.remove('page-entering', 'page-exiting');
+    document.body.removeAttribute('style');
+    window.scrollTo(0, 0);
+    window.location.reload();
+  }
+});
+</script>

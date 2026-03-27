@@ -1,0 +1,252 @@
+<!-- ============================================================
+     RNR STUDIO - WEBFLOW GLOBAL CUSTOM CODE
+     Last updated: 2026-03-14
+     ============================================================ -->
+
+
+<!-- ============================================================
+     HEAD CODE (Webflow > Project Settings > Custom Code > Head)
+     ============================================================ -->
+
+<style>
+/* ===========================================
+   CRITICAL CSS - FOUC & PAGE TRANSITIONS
+   =========================================== */
+html { background-color: #1a1a1a; transition: background-color 0.3s ease; scrollbar-gutter: stable; }
+/* Body controls scroll only — nav and global elements always visible */
+body { overflow: hidden; }
+html.has-intro body { overflow: visible; }
+body.page-entering { overflow: visible; }
+body.page-exiting { overflow: hidden; }
+/* page-wrapper starts hidden + blurred */
+.page-wrapper {
+  opacity: 0;
+  filter: blur(12px);
+}
+/* Homepage: page-wrapper must be visible so intro overlay can render */
+html.has-intro .page-wrapper {
+  opacity: 1;
+  filter: none;
+}
+/* Entrance: fade in + unblur */
+body.page-entering .page-wrapper {
+  transition: opacity 0.8s cubic-bezier(0.25, 0.1, 0.25, 1), filter 0.6s ease-out;
+  opacity: 1;
+  filter: blur(0px);
+}
+/* Exit: fade out + blur */
+body.page-exiting .page-wrapper {
+  transition: opacity 0.3s ease-in, filter 0.3s ease-in;
+  opacity: 0;
+  filter: blur(12px);
+}
+/* ===========================================
+   ANIMATION SYSTEM - ELEMENT HIDING (OPT-IN)
+   =========================================== */
+/* Hide opt-in animated elements until ready */
+html:not(.animations-ready) [data-animate] {
+  opacity: 0;
+}
+/* Hide hero stagger elements until intro completes */
+html:not(.hero-ready) [data-animate-hero] {
+  opacity: 0;
+}
+/* ===========================================
+   EXCLUSIONS - Opt-out system
+   =========================================== */
+.no-animate,
+.skip-animation,
+[data-animate="none"],
+[data-skip-animation="true"] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+/* ===========================================
+   TEXT ANIMATION MASKS
+   DISABLED - Causes clipping on italics
+   =========================================== */
+/* Mask styles removed - italics were clipping */
+/* ===========================================
+   PERFORMANCE OPTIMIZATIONS
+   =========================================== */
+[data-animate],
+[data-animate-hero] {
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* ===========================================
+   CLONED ELEMENTS
+   =========================================== */
+.cloned * {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+</style>
+<!-- ===========================================
+     PRELOAD CRITICAL RESOURCES
+     =========================================== -->
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://slater.app">
+<link rel="dns-prefetch" href="https://assets.slater.app">
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://www.clarity.ms">
+<!-- ===========================================
+     PAGE TRANSITION: MATCH OUTGOING BG COLOR
+     Prevents dark flash when navigating from light pages
+     =========================================== -->
+<script>
+(function() {
+  var bg = sessionStorage.getItem('rnr-transition-bg');
+  if (bg) {
+    document.documentElement.style.backgroundColor = bg;
+    sessionStorage.removeItem('rnr-transition-bg');
+  }
+})();
+</script>
+<!-- ===========================================
+     HOMEPAGE INTRO SESSION CHECK
+     Must be in <head> so body is visible before paint
+     =========================================== -->
+<script>
+if (window.location.pathname === '/' || window.location.pathname === '/index' || window.location.pathname === '/index.html') {
+  document.documentElement.classList.add('has-intro');
+}
+</script>
+<!-- ===========================================
+     GSAP DETECTION & READINESS
+     =========================================== -->
+<script>
+(function() {
+  // No overlay needed — blur is applied directly to .page-wrapper via CSS
+
+  // === ENTRANCE: fade in the page once ready ===
+  function revealPage() {
+    document.documentElement.classList.add('gsap-loaded');
+
+    // If homepage intro exists, it handles its own reveal — don't interfere
+    if (document.querySelector('.intro-overlay')) return;
+
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        document.body.classList.add('page-entering');
+
+        // After entrance transition finishes:
+        // 1. Reset html bg back to default
+        // 2. Clear the CSS filter on .page-wrapper (blur(0px) still creates
+        //    a containing block that breaks GSAP position:fixed pins)
+        // 3. Refresh ScrollTrigger so pin positions are recalculated
+        var pw = document.querySelector('.page-wrapper');
+        function cleanupAfterEntrance() {
+          document.documentElement.style.backgroundColor = '';
+          if (pw) {
+            pw.style.filter = 'none';
+          }
+          if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+        }
+
+        if (pw) {
+          function onTransitionEnd(e) {
+            if (e.propertyName === 'opacity' || e.propertyName === 'filter') {
+              pw.removeEventListener('transitionend', onTransitionEnd);
+              cleanupAfterEntrance();
+            }
+          }
+          pw.addEventListener('transitionend', onTransitionEnd);
+        }
+        // Fallback if transitionend never fires
+        setTimeout(cleanupAfterEntrance, 1200);
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof gsap !== 'undefined') {
+        revealPage();
+      } else {
+        document.documentElement.classList.add('gsap-not-found');
+        setTimeout(revealPage, 100);
+      }
+    });
+  } else {
+    if (typeof gsap !== 'undefined') {
+      revealPage();
+    } else {
+      document.documentElement.classList.add('gsap-not-found');
+      setTimeout(revealPage, 100);
+    }
+  }
+
+  // Fallback: reveal after 2s no matter what (skip if intro page)
+  setTimeout(function() {
+    if (!document.body.classList.contains('page-entering') && !document.querySelector('.intro-overlay')) {
+      revealPage();
+      document.documentElement.classList.add('animations-ready');
+    }
+  }, 2000);
+
+  // === EXIT: fade out on link click, then navigate ===
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a[href]');
+    if (!link) return;
+
+    var href = link.getAttribute('href');
+    // Skip: anchors, external, mailto, tel, new tabs, Webflow tabs/sliders
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') ||
+        href.startsWith('tel:') || href.startsWith('javascript:') ||
+        link.target === '_blank' || link.hostname !== window.location.hostname) return;
+
+    e.preventDefault();
+    if (window.lenis) window.lenis.stop();
+
+    // Capture outgoing page's visible background for smooth transition
+    (function() {
+      var bg = null;
+      var pw = document.querySelector('.page-wrapper');
+      // Walk first few children to find a non-transparent bg
+      if (pw) {
+        var child = pw.firstElementChild;
+        var tries = 0;
+        while (child && tries < 5) {
+          var cbg = getComputedStyle(child).backgroundColor;
+          if (cbg && cbg !== 'rgba(0, 0, 0, 0)' && cbg !== 'transparent') {
+            bg = cbg;
+            break;
+          }
+          child = child.nextElementSibling;
+          tries++;
+        }
+      }
+      if (!bg) {
+        var bodyBg = getComputedStyle(document.body).backgroundColor;
+        if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') bg = bodyBg;
+      }
+      if (bg) sessionStorage.setItem('rnr-transition-bg', bg);
+    })();
+
+    // Clear intro override so exit transition can work
+    document.documentElement.classList.remove('has-intro');
+    document.body.classList.add('page-exiting');
+
+    // Navigate after exit transition completes (300ms matches CSS)
+    setTimeout(function() {
+      window.location.href = href;
+    }, 350);
+  });
+})();
+</script>
+<!-- Legacy flicker prevention (backwards compatibility) -->
+<noscript><style>[data-prevent-flicker='true'] { visibility: visible !important; }</style></noscript>
+<!-- ===========================================
+     ANALYTICS
+     =========================================== -->
+<script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "nseqskty7v");
+</script>

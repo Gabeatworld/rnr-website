@@ -1,0 +1,342 @@
+<script>
+(() => {
+  const SUBMIT_URL = 'https://proposal-builder.gabe-cf2.workers.dev/api/leads/submit';
+
+  const form = document.querySelector('[data-component="talk-form"]');
+  const steps = Array.from(form.querySelectorAll('.talk__form__message__wrapper'));
+  const sendBtn = form.querySelector('.talk__form__send__bt');
+  const stepCount = form.querySelector('.talk__form__step-count');
+  const totalSteps = steps.length - 1; // exclude intro
+  let currentIndex = 0;
+
+  function updateStepCount() {
+    if (!stepCount) return;
+    const display = Math.min(currentIndex, totalSteps);
+    stepCount.textContent = display + ' / ' + totalSteps;
+  }
+
+  function activateStep(index) {
+    steps.forEach((step, i) => {
+      step.classList.remove('active');
+      if (i <= index) step.classList.add('show');
+      if (i < index) step.classList.add('valid');
+    });
+    const step = steps[index];
+    step.classList.add('active', 'show');
+    const input = step.querySelector('input[type="text"]');
+    if (input) {
+      input.style.opacity = '1';
+      input.tabIndex = 0;
+      input.focus();
+      // Show the value span as live mirror, hide input visually
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) {
+        valueSpan.style.borderBottom = '1px solid currentColor';
+        valueSpan.style.minWidth = '3ch';
+        valueSpan.style.display = 'inline-block';
+      }
+    }
+    checkValidity(step);
+    updateStepCount();
+  }
+
+  function checkValidity(step) {
+    const input = step.querySelector('input');
+    const options = step.querySelector('.options');
+    if (!input && !options) {
+      step.classList.add('valid');
+      return true;
+    }
+    if (options) {
+      if (step.querySelector('.options span.active')) {
+        step.classList.add('valid');
+        return true;
+      }
+      return false;
+    }
+    if (input) {
+      const min = parseInt(input.minLength) || 0;
+      if (input.value.length >= min) {
+        const valueSpan = step.querySelector('.talk__form__message__value');
+        if (valueSpan) valueSpan.textContent = input.value;
+        if (input.value.length > 0 || min === 0) {
+          step.classList.add('valid');
+          return true;
+        }
+      }
+      return false;
+    }
+    return true;
+  }
+
+  function advanceStep() {
+    const step = steps[currentIndex];
+    if (!step.classList.contains('valid')) return;
+    const input = step.querySelector('input[type="text"]');
+    if (input) {
+      input.tabIndex = -1;
+      input.style.opacity = '0';
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) {
+        valueSpan.textContent = input.value;
+        valueSpan.style.borderBottom = 'none';
+      }
+    }
+    currentIndex++;
+    if (currentIndex < steps.length) {
+      activateStep(currentIndex);
+    } else {
+      form.classList.add('ready');
+      updateStepCount();
+    }
+  }
+
+  // Option pill click
+  form.querySelectorAll('.options span').forEach(option => {
+    option.addEventListener('click', () => {
+      const container = option.closest('.options');
+      const isMultiple = container.classList.contains('multiple');
+      const hiddenInput = option.closest('.talk__form__message__wrapper').querySelector('input[type="hidden"]');
+      if (isMultiple) {
+        option.classList.toggle('active');
+      } else {
+        container.querySelectorAll('span').forEach(s => s.classList.remove('active'));
+        option.classList.add('active');
+      }
+      if (hiddenInput) {
+        const selected = Array.from(container.querySelectorAll('span.active')).map(s => s.textContent.trim());
+        hiddenInput.value = selected.join(', ');
+      }
+      checkValidity(option.closest('.talk__form__message__wrapper'));
+    });
+  });
+
+  // Real-time input display
+  form.querySelectorAll('input[type="text"]').forEach(input => {
+    input.addEventListener('input', () => {
+      const step = input.closest('.talk__form__message__wrapper');
+      const valueSpan = step.querySelector('.talk__form__message__value');
+      if (valueSpan) valueSpan.textContent = input.value;
+      checkValidity(step);
+    });
+  });
+
+  // Enter key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); advanceStep(); }
+  });
+
+  // Clickable tags
+  form.querySelectorAll('.tag').forEach(tag => {
+    tag.addEventListener('click', () => advanceStep());
+  });
+
+  // Send — submit to Command Center API + let Webflow handle email
+  sendBtn.addEventListener('click', async () => {
+    if (!form.classList.contains('ready')) return;
+    form.classList.add('sending');
+
+    const data = {
+      name: form.querySelector('input[name="name"]').value,
+      email: form.querySelector('input[name="email"]').value,
+      budget: form.querySelector('input[name="budget"]').value.trim(),
+      message: form.querySelector('input[name="message"]').value,
+    };
+
+    // Send to Command Center (async, don't block)
+    fetch(SUBMIT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).catch(err => console.error('Command Center submission error:', err));
+
+    // Submit the Webflow form natively (handles email notifications)
+    try {
+      const wfForm = form.closest('form') || form;
+      const formData = new FormData(wfForm);
+      await fetch(wfForm.getAttribute('action') || location.pathname, {
+        method: 'POST',
+        body: formData,
+      });
+    } catch (err) {
+      console.error('Webflow form submission error:', err);
+    }
+
+    // Show success
+    const success = form.querySelector('.talk__form__success');
+    success.style.opacity = '1';
+    success.style.pointerEvents = 'all';
+    form.querySelector('.talk__form__message__content').style.opacity = '0';
+  });
+
+  // ============================================
+  // WEBGL BLOB (simplex noise metaball)
+  // ============================================
+  const canvas = document.querySelector('.talk__form__blob');
+  if (canvas && canvas.getContext) {
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    if (gl) {
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      let mouseX = 0.5, mouseY = 0.5;
+      let energy = 0; // 0 = idle, 1 = active
+
+      function resize() {
+        const w = canvas.parentElement.offsetWidth;
+        const h = canvas.parentElement.offsetHeight;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+
+      const vertSrc = `
+        attribute vec2 a_pos;
+        void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+      `;
+
+      const fragSrc = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        uniform vec2 u_mouse;
+        uniform float u_energy;
+
+        vec3 mod289(vec3 x) { return x - floor(x / 289.0) * 289.0; }
+        vec2 mod289(vec2 x) { return x - floor(x / 289.0) * 289.0; }
+        vec3 permute(vec3 x) { return mod289((x * 34.0 + 1.0) * x); }
+        float snoise(vec2 v) {
+          const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+          vec2 i = floor(v + dot(v, C.yy));
+          vec2 x0 = v - i + dot(i, C.xx);
+          vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+          vec4 x12 = x0.xyxy + C.xxzz; x12.xy -= i1;
+          i = mod289(i);
+          vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+          vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+          m = m * m; m = m * m;
+          vec3 x = 2.0 * fract(p * C.www) - 1.0;
+          vec3 h = abs(x) - 0.5;
+          vec3 a0 = x - floor(x + 0.5);
+          m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+          vec3 g; g.x = a0.x * x0.x + h.x * x0.y; g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+          return 130.0 * dot(m, g);
+        }
+
+        void main() {
+          vec2 uv = gl_FragCoord.xy / u_resolution;
+          float aspect = u_resolution.x / u_resolution.y;
+          vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+          float t = u_time * (0.12 + u_energy * 0.08);
+
+          // 3 soft metaballs drifting slowly
+          float field = 0.0;
+          for (int i = 0; i < 3; i++) {
+            float fi = float(i);
+            vec2 center = vec2(
+              sin(t * (0.7 + fi * 0.3) + fi * 2.0) * 0.25,
+              cos(t * (0.5 + fi * 0.4) + fi * 1.5) * 0.2
+            );
+            // Mouse pulls the nearest blob
+            center += (u_mouse - 0.5) * vec2(aspect, 1.0) * (0.08 + u_energy * 0.06) * (1.0 - fi * 0.3);
+            float d = length(p - center);
+            field += 0.04 / (d * d + 0.01);
+          }
+
+          field = smoothstep(1.5, 4.0, field);
+
+          // Cream blobs on black — #ebe4e0 on #1a1a1a
+          vec3 cream1 = vec3(0.922, 0.894, 0.878);
+          vec3 cream2 = vec3(0.85, 0.82, 0.80);
+          float colorNoise = snoise(p * 3.0 + t) * 0.5 + 0.5;
+          vec3 blobColor = mix(cream1, cream2, colorNoise);
+
+          vec3 base = vec3(0.102, 0.102, 0.102);
+          vec3 color = mix(base, blobColor, field * (0.4 + u_energy * 0.15));
+
+          // Subtle grain
+          float grain = fract(sin(dot(uv * u_resolution, vec2(12.9898, 78.233))) * 43758.5453);
+          color += (grain - 0.5) * 0.015;
+
+          float alpha = 0.6 + field * 0.4;
+          gl_FragColor = vec4(color, alpha);
+        }
+      `;
+
+      function createShader(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return s;
+      }
+
+      const prog = gl.createProgram();
+      gl.attachShader(prog, createShader(gl.VERTEX_SHADER, vertSrc));
+      gl.attachShader(prog, createShader(gl.FRAGMENT_SHADER, fragSrc));
+      gl.linkProgram(prog);
+      gl.useProgram(prog);
+
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+      const aPos = gl.getAttribLocation(prog, 'a_pos');
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+      const uTime = gl.getUniformLocation(prog, 'u_time');
+      const uRes = gl.getUniformLocation(prog, 'u_resolution');
+      const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+      const uEnergy = gl.getUniformLocation(prog, 'u_energy');
+
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      // Mouse tracking
+      const wrapper = canvas.closest('.talk__form-wrapper');
+      wrapper.addEventListener('mousemove', (e) => {
+        const rect = wrapper.getBoundingClientRect();
+        mouseX = (e.clientX - rect.left) / rect.width;
+        mouseY = 1.0 - (e.clientY - rect.top) / rect.height; // flip Y for GL
+      });
+
+      // Energy from form interaction
+      let energyTimer;
+      form.addEventListener('focusin', () => { energy = 1; });
+      form.addEventListener('focusout', () => { energy = 0; });
+      form.addEventListener('input', () => {
+        energy = 1;
+        clearTimeout(energyTimer);
+        energyTimer = setTimeout(() => { energy = 0; }, 1500);
+      });
+      form.querySelectorAll('.options span').forEach(opt => {
+        opt.addEventListener('click', () => {
+          energy = 1;
+          clearTimeout(energyTimer);
+          energyTimer = setTimeout(() => { energy = 0; }, 1000);
+        });
+      });
+
+      let smoothEnergy = 0;
+      function render(t) {
+        smoothEnergy += (energy - smoothEnergy) * 0.05;
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.uniform1f(uTime, t * 0.001);
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+        gl.uniform2f(uMouse, mouseX, mouseY);
+        gl.uniform1f(uEnergy, smoothEnergy);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        requestAnimationFrame(render);
+      }
+      requestAnimationFrame(render);
+    }
+  }
+
+  // Initialize
+  activateStep(0);
+  updateStepCount();
+})();
+</script>

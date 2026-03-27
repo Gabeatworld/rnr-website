@@ -1,0 +1,118 @@
+<!-- Intro Phrase — word-by-word blur reveal
+     Code embed inside intro-overlay in Webflow
+     Random phrase on every visit -->
+
+<style>
+.intro-phrase {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #f5f5f0;
+}
+.intro-phrase__text {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3em;
+}
+.intro-phrase__word {
+  display: inline-block;
+  white-space: pre;
+}
+</style>
+
+<script>
+(function() {
+  const newVisitorPhrases = [
+    "We build for the bold.",
+    "Where culture meets craft.",
+    "Your vision. Our obsession.",
+    "This is where it starts.",
+    "Made for those who move culture.",
+    "Not for everyone. For you."
+  ];
+
+  const returnVisitorPhrases = [
+    "Back for more? Good.",
+    "Let's make something again.",
+    "Missed you. Let's go.",
+    "You know the vibe.",
+    "Ready when you are.",
+    "Welcome back. Let's work."
+  ];
+
+  const isReturn = !!sessionStorage.getItem('rnr-intro-seen');
+  const phrases = isReturn ? returnVisitorPhrases : newVisitorPhrases;
+
+  // Avoid repeating the last phrase shown
+  const lastPhrase = sessionStorage.getItem('rnr-last-phrase');
+  const available = phrases.filter(p => p !== lastPhrase);
+  const phrase = available[Math.floor(Math.random() * available.length)] || phrases[0];
+  sessionStorage.setItem('rnr-last-phrase', phrase);
+
+  // Mark session so next visit gets return phrases
+  if (!isReturn) sessionStorage.setItem('rnr-intro-seen', '1');
+
+  // Timing
+  const WORD_STAGGER = 220;
+  const BLUR_START = 14;
+  const BLUR_DURATION = 600;
+  const START_DELAY = 400;
+  const HOLD_AFTER = 800;
+
+  // Build DOM
+  const wrapper = document.createElement('div');
+  wrapper.className = 'intro-phrase size-5';
+
+  const textEl = document.createElement('span');
+  textEl.className = 'intro-phrase__text';
+  wrapper.appendChild(textEl);
+
+  const container = document.currentScript?.parentElement;
+  if (container) {
+    container.appendChild(wrapper);
+  }
+
+  // Split into words
+  const words = phrase.split(' ');
+  const wordEls = [];
+
+  words.forEach(word => {
+    const span = document.createElement('span');
+    span.className = 'intro-phrase__word';
+    span.textContent = word;
+    span.style.opacity = '0';
+    span.style.filter = 'blur(' + BLUR_START + 'px)';
+    span.style.transform = 'translateY(4px)';
+    textEl.appendChild(span);
+    wordEls.push(span);
+  });
+
+  // Reveal a word
+  function revealWord(el) {
+    el.style.opacity = '1';
+    el.style.transition = 'opacity 0.3s ease-out, filter ' + BLUR_DURATION + 'ms ease-out, transform ' + BLUR_DURATION + 'ms ease-out';
+
+    requestAnimationFrame(() => {
+      el.style.filter = 'blur(0px)';
+      el.style.transform = 'translateY(0)';
+    });
+  }
+
+  // Stagger words
+  setTimeout(() => {
+    wordEls.forEach((el, i) => {
+      setTimeout(() => revealWord(el), i * WORD_STAGGER);
+    });
+
+    const totalDuration = (wordEls.length - 1) * WORD_STAGGER + BLUR_DURATION + HOLD_AFTER;
+    setTimeout(() => {
+      window._introPhraseComplete = true;
+      window.dispatchEvent(new CustomEvent('intro-phrase-complete'));
+    }, totalDuration);
+  }, START_DELAY);
+})();
+</script>

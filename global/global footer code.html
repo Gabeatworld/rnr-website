@@ -1,0 +1,694 @@
+<!-- ============================================================
+     FOOTER CODE (Webflow > Project Settings > Custom Code > Footer)
+     ============================================================ -->
+
+<!-- Lenis (Smooth Scroll) — NO async, must load before init script -->
+<script src="https://unpkg.com/lenis@1.3.11/dist/lenis.min.js"></script>
+
+<!-- Swiper (v10 CSS + JS matched) — NO async, needed by page scripts -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
+
+<!-- Google tag (gtag.js) — async is fine, nothing depends on it -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-17963033649"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'AW-17963033649');
+</script>
+
+<script>
+//=======================
+// ENHANCED TEXT ANIMATION SYSTEM
+// Drop-in replacement with Lisovskiy-inspired optimizations
+//=======================
+
+const CONFIG = {
+  lenis: {
+    duration: 0.4,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    smoothWheel: true,
+    wheelMultiplier: 1,
+    touchMultiplier: 1,
+    infinite: false
+  },
+  animations: {
+    text: {
+      duration: 0.9,
+      stagger: 0.15,
+      start: "top bottom-=50px",
+      end: "top 95%",
+      blurStart: 6,
+      delay: 0.05
+    },
+    heading: {
+      duration: 1.1,
+      stagger: 0.2,
+      start: "top bottom-=100px",
+      end: "top 95%",
+      blurStart: 10,
+      delay: 0.05
+    },
+    visual: {
+      duration: 1.2,
+      start: "top bottom",
+      end: "top 50%"
+    }
+  },
+  selectors: {
+    textElements: '[data-animate="text"]',
+    headingElements: '[data-animate="heading"]',
+    visualElements: '[data-animate="visual"]',
+    excludeParents: '.nav, .cursor-text, [data-no-animate]'
+  },
+  breakpoints: {
+    cursorDisableUnder: 992,
+    mobileBreakpoint: 768
+  }
+};
+
+//=======================
+// ENHANCED STATE MANAGEMENT
+//=======================
+const state = {
+  lenis: null,
+  splitTextInstances: [],
+  menuWasVisible: false,
+  isInitialized: false,
+  resizeTimer: null
+};
+
+//=======================
+// OPTIMIZED LENIS SETUP (Slater Global)
+//=======================
+function setupLenis() {
+  // 1. More robust check for mobile/touch
+  const isTouchDevice = 'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    window.innerWidth <= 991;
+
+  if (isTouchDevice) {
+    // Mobile/Touch: skip Lenis for native scroll performance
+    return;
+  }
+
+  // 2. Initialize only for Desktop
+  state.lenis = new Lenis(CONFIG.lenis);
+
+  // Link to GSAP Ticker
+  gsap.ticker.add((time) => {
+    state.lenis.raf(time * 1000);
+  });
+  gsap.ticker.lagSmoothing(0);
+
+  // Update ScrollTrigger on Lenis scroll
+  state.lenis.on('scroll', ScrollTrigger.update);
+  window.lenis = state.lenis;
+}
+
+//=======================
+// OPTIMIZED TEXT ANIMATIONS (MOBILE FRIENDLY)
+//=======================
+function setupTextAnimations() {
+  const paragraphs = document.querySelectorAll(CONFIG.selectors.textElements);
+  const isMobile = window.innerWidth <= CONFIG.breakpoints.mobileBreakpoint;
+
+  paragraphs.forEach((text) => {
+    if (!text.textContent.trim()) return;
+    if (text.closest(CONFIG.selectors.excludeParents)) return;
+    if (text.dataset.splitProcessed) return;
+
+    text.dataset.splitProcessed = 'true';
+    text.setAttribute('data-prevent-flicker', 'true');
+
+    const split = new SplitText(text, {
+      type: "words",
+      wordsClass: "word word-mask"
+    });
+    state.splitTextInstances.push(split);
+
+    gsap.set(text, {
+      visibility: "visible",
+      onComplete: () => text.removeAttribute('data-prevent-flicker')
+    });
+
+    // Performance tweak: Strip blur on mobile
+    gsap.set(split.words, {
+      willChange: "transform, opacity",
+      opacity: 0,
+      y: isMobile ? 10 : 0,
+      filter: isMobile ? "none" : `blur(${CONFIG.animations.text.blurStart}px)`,
+      force3D: true
+    });
+
+    gsap.timeline({
+      scrollTrigger: {
+        trigger: text,
+        start: CONFIG.animations.text.start,
+        end: CONFIG.animations.text.end,
+        toggleActions: "play none none reverse"
+      }
+    })
+    .to(split.words, {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      delay: CONFIG.animations.text.delay,
+      duration: CONFIG.animations.text.duration,
+      stagger: { amount: CONFIG.animations.text.stagger },
+      ease: "power2.out",
+      onComplete: function () {
+        gsap.set(this.targets(), { clearProps: "willChange,filter" });
+      }
+    });
+  });
+}
+
+//=======================
+// SMART HEADING ANIMATIONS (MOBILE FRIENDLY)
+//=======================
+function setupHeadingAnimations() {
+  const headings = document.querySelectorAll(CONFIG.selectors.headingElements);
+  const isMobile = window.innerWidth <= CONFIG.breakpoints.mobileBreakpoint;
+
+  headings.forEach((heading) => {
+    if (!heading.textContent.trim()) return;
+    if (heading.closest(CONFIG.selectors.excludeParents)) return;
+    if (heading.dataset.splitProcessed) return;
+
+    heading.dataset.splitProcessed = 'true';
+    heading.setAttribute('data-prevent-flicker', 'true');
+
+    const wordCount = heading.textContent.trim().split(/\s+/).length;
+    const useLetterSplit = wordCount <= 2 && !isMobile;
+
+    const split = new SplitText(heading, {
+      type: useLetterSplit ? "chars,words" : "words",
+      charsClass: "char char-mask",
+      wordsClass: "word word-mask"
+    });
+    state.splitTextInstances.push(split);
+
+    gsap.set(heading, {
+      visibility: "visible",
+      onComplete: () => heading.removeAttribute('data-prevent-flicker')
+    });
+
+    const animateElements = useLetterSplit ? split.chars : split.words;
+    const staggerAmount = useLetterSplit
+      ? CONFIG.animations.heading.stagger * 0.5
+      : CONFIG.animations.heading.stagger;
+
+    gsap.set(animateElements, {
+      willChange: "transform, opacity",
+      opacity: 0,
+      y: isMobile ? 15 : 0,
+      filter: isMobile ? "none" : `blur(${CONFIG.animations.heading.blurStart}px)`,
+      force3D: true
+    });
+
+    gsap.timeline({
+      scrollTrigger: {
+        trigger: heading,
+        start: CONFIG.animations.heading.start,
+        end: CONFIG.animations.heading.end,
+        toggleActions: "play none none reverse"
+      }
+    })
+    .to(animateElements, {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      delay: CONFIG.animations.heading.delay,
+      duration: CONFIG.animations.heading.duration,
+      stagger: { amount: staggerAmount },
+      ease: "power2.out",
+      onComplete: function () {
+        gsap.set(this.targets(), { clearProps: "willChange,filter" });
+      }
+    });
+  });
+}
+
+//=======================
+// VISUAL ANIMATIONS
+//=======================
+function setupVisualAnimations() {
+  const elements = document.querySelectorAll(CONFIG.selectors.visualElements);
+
+  elements.forEach((el) => {
+    gsap.set(el, {
+      filter: "grayscale(100%) brightness(0.8)",
+      opacity: 0.1,
+      willChange: "opacity, filter, transform"
+    });
+
+    gsap.timeline({
+      scrollTrigger: {
+        trigger: el,
+        start: CONFIG.animations.visual.start,
+        end: CONFIG.animations.visual.end,
+        toggleActions: "play none none reset"
+      }
+    })
+    .to(el, {
+      filter: "grayscale(0%) brightness(1)",
+      opacity: 1,
+      duration: CONFIG.animations.visual.duration,
+      ease: "power2.out",
+      clearProps: "willChange"
+    });
+  });
+}
+
+//=======================
+// ENHANCED EVENT HANDLERS
+//=======================
+function setupEventHandlers() {
+  let currentBreakpoint = getBreakpoint();
+
+  // Optimized resize handling
+  window.addEventListener('resize', () => {
+    clearTimeout(state.resizeTimer);
+    state.resizeTimer = setTimeout(() => {
+      const newBreakpoint = getBreakpoint();
+      if (newBreakpoint !== currentBreakpoint) {
+        currentBreakpoint = newBreakpoint;
+        refreshAnimationsForBreakpoint();
+      }
+      ScrollTrigger.refresh();
+      if (state.lenis) state.lenis.resize();
+    }, 150);
+  });
+
+  // Enhanced menu parallax
+  document.addEventListener('mousemove', e => {
+    const navMenuWrap = document.querySelector('.nav_menu_wrap');
+    if (!navMenuWrap) return;
+
+    const styles = getComputedStyle(navMenuWrap);
+    const isVisible = styles.display !== 'none' &&
+      styles.visibility !== 'hidden' &&
+      parseFloat(styles.opacity) > 0.01;
+
+    if (state.menuWasVisible && !isVisible) {
+      gsap.to('.nav_link_wrap', { y: 0, duration: 0.1, ease: 'power2.out' });
+    }
+
+    state.menuWasVisible = isVisible;
+
+    if (isVisible) {
+      const positionRatio = e.clientY / window.innerHeight;
+      const moveDistance = (0.5 - positionRatio) * 35;
+      gsap.to('.nav_link_wrap', {
+        y: `${moveDistance}vh`,
+        duration: 1.2,
+        ease: 'power2.back'
+      });
+    }
+  });
+
+  // Lenis menu control
+  const menuToggle = document.querySelector('[data-menu-toggle]');
+  if (menuToggle && state.lenis) {
+    menuToggle.addEventListener('click', () => {
+      const isOpen = menuToggle.getAttribute('aria-expanded') === 'true';
+      if (isOpen) state.lenis.stop();
+      else state.lenis.start();
+    });
+  }
+
+  // Menu button text blur swap (open ↔ close)
+  const menuBtn = document.querySelector('.nav_link.is--menu');
+  const openText = document.querySelector('.nav-menu-button-text-open');
+  const closeText = document.querySelector('.nav-menu-button-text-close');
+
+  if (menuBtn && openText && closeText) {
+    gsap.set(closeText, { opacity: 0, filter: 'blur(4px)' });
+    let menuOpen = false;
+
+    menuBtn.addEventListener('click', () => {
+      menuOpen = !menuOpen;
+
+      if (menuOpen) {
+        gsap.to(openText, { opacity: 0, filter: 'blur(4px)', duration: 0.25, ease: 'power2.in',
+          onComplete: () => gsap.to(closeText, { opacity: 1, filter: 'blur(0px)', duration: 0.3, ease: 'power2.out' })
+        });
+      } else {
+        gsap.to(closeText, { opacity: 0, filter: 'blur(4px)', duration: 0.25, ease: 'power2.in',
+          onComplete: () => gsap.to(openText, { opacity: 1, filter: 'blur(0px)', duration: 0.3, ease: 'power2.out' })
+        });
+      }
+    });
+  }
+}
+
+//=======================
+// UTILITY FUNCTIONS
+//=======================
+function getBreakpoint() {
+  const width = window.innerWidth;
+  if (width >= 1200) return 'desktop';
+  if (width >= CONFIG.breakpoints.mobileBreakpoint) return 'tablet';
+  return 'mobile';
+}
+
+function refreshAnimationsForBreakpoint() {
+  const isMobile = window.innerWidth <= CONFIG.breakpoints.mobileBreakpoint;
+  if (isMobile) {
+    CONFIG.animations.text.stagger = 0.1;
+    CONFIG.animations.heading.stagger = 0.15;
+  } else {
+    CONFIG.animations.text.stagger = 0.15;
+    CONFIG.animations.heading.stagger = 0.2;
+  }
+}
+
+//=======================
+// ENHANCED CURSOR TEXT MODULE
+//=======================
+window.cursorText = (() => {
+  'use strict';
+
+  const BP_DISABLE = CONFIG.breakpoints.cursorDisableUnder;
+  const FOLLOW_LERP = 0.18;
+  const IN_EASE = 'power2.out';
+  const OUT_EASE = 'power2.in';
+  const LETTER_STAGGER = 0.015;
+  const LETTER_FROM_Y = 6;
+  const ATTR_TEXT = 'data-cursor-text';
+  const ATTR_CLASS = 'data-cursor-text-class';
+  const ATTR_OFFSET = 'data-cursor-offset';
+  const ATTR_DISABLE = 'data-cursor-disabled';
+
+  if (!window.gsap) {
+    return { enable() {}, disable() {}, destroy() {} };
+  }
+
+  const root = document.createElement('div');
+  root.className = 'cursor-text';
+  root.setAttribute('aria-hidden', 'true');
+  root.innerHTML = `
+    <div class="cursor-text__chip">
+      <div class="cursor-text__inner">
+        <span class="cursor-text__label"></span>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(root);
+
+  const chip = root.querySelector('.cursor-text__chip');
+  const label = root.querySelector('.cursor-text__label');
+  let enabled = window.innerWidth >= BP_DISABLE;
+  let currentTrigger = null;
+  let isVisible = false;
+  let offsetX = 16, offsetY = 16;
+  let targetX = 0, targetY = 0;
+  let x = 0, y = 0, rafId = null;
+  let tlIn = null, tlOut = null;
+
+  function setOffsetFromAttr(el) {
+    const raw = el.getAttribute(ATTR_OFFSET);
+    if (!raw) { offsetX = 16; offsetY = 16; return; }
+    const [ox, oy] = raw.split(',');
+    offsetX = parseInt(ox, 10) || 16;
+    offsetY = parseInt(oy, 10) || 16;
+  }
+
+  function setLabelTextAndClass(text, classListStr) {
+    label.className = 'cursor-text__label';
+    if (classListStr) classListStr.split(/\s+/).forEach(c => c && label.classList.add(c));
+    label.textContent = '';
+    const frag = document.createDocumentFragment();
+    for (const ch of (text || '')) {
+      const span = document.createElement('span');
+      span.className = 'cursor-letter';
+      span.textContent = ch === ' ' ? '\u00A0' : ch;
+      frag.appendChild(span);
+    }
+    label.appendChild(frag);
+    return label.querySelectorAll('.cursor-letter');
+  }
+
+  function playIn(letters) {
+    tlOut && tlOut.kill();
+    tlIn && tlIn.kill();
+    if (isVisible) return;
+
+    tlIn = gsap.timeline({
+      defaults: { ease: IN_EASE },
+      onStart: () => { isVisible = true; }
+    });
+    tlIn.fromTo(chip, { scaleY: 0 }, { scaleY: 1, duration: 0.22 }, 0);
+    tlIn.to(root, { opacity: 1, duration: 0.12 }, 0);
+    if (letters.length) {
+      gsap.set(letters, { opacity: 0, y: LETTER_FROM_Y });
+      tlIn.to(letters, {
+        opacity: 1, y: 0, duration: 0.22, stagger: LETTER_STAGGER
+      }, 0.05);
+    }
+    root.classList.add('is-visible');
+  }
+
+  function playOut() {
+    tlIn && tlIn.kill();
+    tlOut && tlOut.kill();
+    if (!isVisible) return;
+
+    tlOut = gsap.timeline({
+      defaults: { ease: OUT_EASE },
+      onStart: () => { isVisible = false; }
+    });
+    tlOut.to(chip, { scaleY: 0, duration: 0.18 }, 0);
+    tlOut.to(root, { opacity: 0, duration: 0.12 }, 0.06);
+    tlOut.add(() => {
+      root.classList.remove('is-visible');
+      label.textContent = '';
+    });
+  }
+
+  function showFor(el) {
+    if (el.getAttribute(ATTR_DISABLE) === 'true') return;
+    if (el === currentTrigger && isVisible) return;
+    const txt = (el.getAttribute(ATTR_TEXT) || '').trim();
+    if (!txt) { hide(); return; }
+    setOffsetFromAttr(el);
+    currentTrigger = el;
+    const classes = el.getAttribute(ATTR_CLASS) || '';
+    const letters = setLabelTextAndClass(txt, classes);
+    playIn(letters);
+  }
+
+  function hide() {
+    if (!isVisible) return;
+    currentTrigger = null;
+    playOut();
+  }
+
+  document.addEventListener('pointerenter', (e) => {
+    if (!enabled) return;
+    if (!(e.target instanceof Element)) return;
+    const el = e.target.closest(`[${ATTR_TEXT}]`);
+    if (el) showFor(el);
+  }, true);
+
+  document.addEventListener('pointerleave', (e) => {
+    if (!enabled) return;
+    if (!(e.target instanceof Element)) return;
+    const el = e.target.closest(`[${ATTR_TEXT}]`);
+    if (el === currentTrigger) hide();
+  }, true);
+
+  window.addEventListener('mousemove', (e) => {
+    if (!enabled) return;
+    targetX = e.clientX + offsetX;
+    targetY = e.clientY + offsetY;
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }, { passive: true });
+
+  function tick() {
+    x += (targetX - x) * FOLLOW_LERP;
+    y += (targetY - y) * FOLLOW_LERP;
+    gsap.set(root, { x, y });
+    if (Math.abs(targetX - x) > 0.1 || Math.abs(targetY - y) > 0.1) {
+      rafId = requestAnimationFrame(tick);
+    } else {
+      rafId = null;
+    }
+  }
+
+  function onResize() {
+    const nowEnabled = window.innerWidth >= BP_DISABLE;
+    if (nowEnabled === enabled) return;
+    enabled = nowEnabled;
+    if (!enabled) hide();
+  }
+
+  function onFirstTouch() {
+    enabled = false;
+    hide();
+    window.removeEventListener('touchstart', onFirstTouch, { passive: true });
+  }
+
+  window.addEventListener('resize', onResize, { passive: true });
+  window.addEventListener('touchstart', onFirstTouch, { passive: true });
+
+  return {
+    enable: () => enabled = window.innerWidth >= BP_DISABLE,
+    disable: () => { enabled = false; hide(); },
+    destroy: () => {
+      tlIn && tlIn.kill();
+      tlOut && tlOut.kill();
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('touchstart', onFirstTouch);
+      root.remove();
+      currentTrigger = null;
+      isVisible = false;
+    }
+  };
+})();
+
+//=======================
+// NAV - HIDE MID LINKS (NO .NAV WRAPPER)
+//=======================
+(() => {
+  const SCROLL_THRESHOLD = 10;
+  const BREAKPOINT = 992;
+
+  const menuBtn = document.querySelector('.nav_link.is--menu');
+  const midLinks = document.querySelectorAll('.nav_links_middle .nav_link.is--middle');
+
+  if (!menuBtn) return;
+  if (!midLinks.length) return;
+
+  // Setup menu button
+  menuBtn.style.overflow = 'hidden';
+  menuBtn.style.display = 'inline-block';
+  menuBtn.style.whiteSpace = 'nowrap';
+
+  // Initial states
+  const isMobile = window.innerWidth <= BREAKPOINT;
+  gsap.set(menuBtn, { width: isMobile ? 'auto' : 0 });
+  gsap.set(midLinks, { opacity: 1, y: 0, pointerEvents: 'auto' });
+
+  // Contact link starts shifted right, returns to OG position on scroll
+  const contactLink = document.querySelector('.nav_link.is--contact');
+  if (contactLink) gsap.set(contactLink, { x: '100%' });
+
+  // Create timeline
+  const tl = gsap.timeline({
+    paused: true,
+    defaults: { ease: 'power2.out', duration: 0.5 }
+  });
+
+  tl.addLabel('start')
+    .to(menuBtn, { width: 'auto', duration: 0.45 }, 'start')
+    .to(midLinks, {
+      opacity: 0, y: -20, pointerEvents: 'none', stagger: 0.05
+    }, 'start');
+
+  if (contactLink) {
+    tl.to(contactLink, { x: 0, duration: 0.45 }, 'start');
+  }
+
+  let isCollapsed = false;
+
+  const applyByScroll = () => {
+    const currentWidth = window.innerWidth;
+
+    // Mobile: always show everything
+    if (currentWidth <= BREAKPOINT) {
+      if (tl.progress() !== 0) {
+        tl.progress(0).pause();
+      }
+      gsap.set(menuBtn, { width: 'auto' });
+      gsap.set(midLinks, { opacity: 1, y: 0, pointerEvents: 'auto' });
+      if (contactLink) gsap.set(contactLink, { x: '100%' });
+      isCollapsed = false;
+      return;
+    }
+
+    // Desktop: check scroll position
+    const shouldCollapse = window.scrollY > SCROLL_THRESHOLD;
+    if (shouldCollapse && !isCollapsed) {
+      tl.play();
+      isCollapsed = true;
+    } else if (!shouldCollapse && isCollapsed) {
+      tl.reverse();
+      isCollapsed = false;
+    }
+  };
+
+  // Set initial state if already scrolled
+  if (window.innerWidth > BREAKPOINT && window.scrollY > SCROLL_THRESHOLD) {
+    tl.progress(1).pause();
+    isCollapsed = true;
+  }
+
+  // Throttled scroll/resize handler
+  let ticking = false;
+  const onScrollResize = () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(() => {
+        applyByScroll();
+        ticking = false;
+      });
+    }
+  };
+
+  window.addEventListener('scroll', onScrollResize, { passive: true });
+  window.addEventListener('resize', onScrollResize);
+
+  // Initial check
+  applyByScroll();
+})();
+
+//=======================
+// SIMPLIFIED INITIALIZATION
+//=======================
+(function initOnce() {
+  // Prevent double init
+  if (document.documentElement.dataset.gsapInitDone === '1') {
+    ScrollTrigger.refresh();
+    return;
+  }
+
+  // Check dependencies
+  if (!window.gsap || !window.ScrollTrigger || !window.SplitText || !window.Lenis) {
+    // Required libraries not loaded - animations disabled
+    return;
+  }
+
+  document.documentElement.dataset.gsapInitDone = '1';
+
+  // Wait for fonts, then init
+  const runInit = () => {
+    setupLenis();
+    setupHeadingAnimations();
+    setupTextAnimations();
+    setupVisualAnimations();
+    setupEventHandlers();
+    ScrollTrigger.refresh();
+    document.documentElement.classList.add('animations-ready');
+  };
+
+  if (document.fonts && document.fonts.status !== 'loaded') {
+    document.fonts.addEventListener('loadingdone', runInit, { once: true });
+  } else {
+    runInit();
+  }
+})();
+
+//=======================
+// MINIMAL PUBLIC API
+//=======================
+window.gsapAnimations = {
+  refresh: () => {
+    ScrollTrigger.refresh();
+    state.lenis?.resize();
+  },
+  lenis: () => state.lenis
+};
+</script>
