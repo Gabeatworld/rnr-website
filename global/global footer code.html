@@ -57,8 +57,7 @@ const CONFIG = {
     }
   },
   selectors: {
-    textElements: '[data-animate="text"]',
-    headingElements: '[data-animate="heading"]',
+    splitElements: '[data-animate="text"], [data-animate="heading"]',
     visualElements: '[data-animate="visual"]',
     excludeParents: '.nav, .cursor-text, [data-no-animate]'
   },
@@ -108,45 +107,42 @@ function setupLenis() {
 }
 
 //=======================
-// OPTIMIZED TEXT ANIMATIONS (MOBILE FRIENDLY)
+// SPLIT TEXT ANIMATIONS — word-by-word, preset-driven
+// Handles both [data-animate="text"] and [data-animate="heading"]
 //=======================
-function setupTextAnimations() {
-  const paragraphs = document.querySelectorAll(CONFIG.selectors.textElements);
+function setupSplitAnimations() {
+  const elements = document.querySelectorAll(CONFIG.selectors.splitElements);
   const isMobile = window.innerWidth <= CONFIG.breakpoints.mobileBreakpoint;
 
-  paragraphs.forEach((text) => {
-    if (!text.textContent.trim()) return;
-    if (text.closest(CONFIG.selectors.excludeParents)) return;
-    if (text.dataset.splitProcessed) return;
+  elements.forEach((el) => {
+    if (!el.textContent.trim()) return;
+    if (el.closest(CONFIG.selectors.excludeParents)) return;
+    if (el.dataset.splitProcessed) return;
 
-    text.dataset.splitProcessed = 'true';
-    text.setAttribute('data-prevent-flicker', 'true');
+    const preset = el.dataset.animate; // "text" | "heading"
+    const cfg = CONFIG.animations[preset] || CONFIG.animations.text;
 
-    const split = new SplitText(text, {
+    el.dataset.splitProcessed = 'true';
+
+    const split = new SplitText(el, {
       type: "words",
       wordsClass: "word word-mask"
     });
     state.splitTextInstances.push(split);
 
-    gsap.set(text, {
-      visibility: "visible",
-      onComplete: () => text.removeAttribute('data-prevent-flicker')
-    });
-
-    // Performance tweak: Strip blur on mobile
     gsap.set(split.words, {
       willChange: "transform, opacity",
       opacity: 0,
-      y: isMobile ? 10 : 0,
-      filter: isMobile ? "none" : `blur(${CONFIG.animations.text.blurStart}px)`,
+      y: isMobile ? (preset === 'heading' ? 15 : 10) : 0,
+      filter: isMobile ? "none" : `blur(${cfg.blurStart}px)`,
       force3D: true
     });
 
     gsap.timeline({
       scrollTrigger: {
-        trigger: text,
-        start: CONFIG.animations.text.start,
-        end: CONFIG.animations.text.end,
+        trigger: el,
+        start: cfg.start,
+        end: cfg.end,
         toggleActions: "play none none reverse"
       }
     })
@@ -154,75 +150,9 @@ function setupTextAnimations() {
       opacity: 1,
       y: 0,
       filter: "blur(0px)",
-      delay: CONFIG.animations.text.delay,
-      duration: CONFIG.animations.text.duration,
-      stagger: { amount: CONFIG.animations.text.stagger },
-      ease: "power2.out",
-      onComplete: function () {
-        gsap.set(this.targets(), { clearProps: "willChange,filter" });
-      }
-    });
-  });
-}
-
-//=======================
-// SMART HEADING ANIMATIONS (MOBILE FRIENDLY)
-//=======================
-function setupHeadingAnimations() {
-  const headings = document.querySelectorAll(CONFIG.selectors.headingElements);
-  const isMobile = window.innerWidth <= CONFIG.breakpoints.mobileBreakpoint;
-
-  headings.forEach((heading) => {
-    if (!heading.textContent.trim()) return;
-    if (heading.closest(CONFIG.selectors.excludeParents)) return;
-    if (heading.dataset.splitProcessed) return;
-
-    heading.dataset.splitProcessed = 'true';
-    heading.setAttribute('data-prevent-flicker', 'true');
-
-    const wordCount = heading.textContent.trim().split(/\s+/).length;
-    const useLetterSplit = wordCount <= 2 && !isMobile;
-
-    const split = new SplitText(heading, {
-      type: useLetterSplit ? "chars,words" : "words",
-      charsClass: "char char-mask",
-      wordsClass: "word word-mask"
-    });
-    state.splitTextInstances.push(split);
-
-    gsap.set(heading, {
-      visibility: "visible",
-      onComplete: () => heading.removeAttribute('data-prevent-flicker')
-    });
-
-    const animateElements = useLetterSplit ? split.chars : split.words;
-    const staggerAmount = useLetterSplit
-      ? CONFIG.animations.heading.stagger * 0.5
-      : CONFIG.animations.heading.stagger;
-
-    gsap.set(animateElements, {
-      willChange: "transform, opacity",
-      opacity: 0,
-      y: isMobile ? 15 : 0,
-      filter: isMobile ? "none" : `blur(${CONFIG.animations.heading.blurStart}px)`,
-      force3D: true
-    });
-
-    gsap.timeline({
-      scrollTrigger: {
-        trigger: heading,
-        start: CONFIG.animations.heading.start,
-        end: CONFIG.animations.heading.end,
-        toggleActions: "play none none reverse"
-      }
-    })
-    .to(animateElements, {
-      opacity: 1,
-      y: 0,
-      filter: "blur(0px)",
-      delay: CONFIG.animations.heading.delay,
-      duration: CONFIG.animations.heading.duration,
-      stagger: { amount: staggerAmount },
+      delay: cfg.delay,
+      duration: cfg.duration,
+      stagger: { amount: cfg.stagger },
       ease: "power2.out",
       onComplete: function () {
         gsap.set(this.targets(), { clearProps: "willChange,filter" });
@@ -666,8 +596,7 @@ window.cursorText = (() => {
   // Wait for fonts, then init
   const runInit = () => {
     setupLenis();
-    setupHeadingAnimations();
-    setupTextAnimations();
+    setupSplitAnimations();
     setupVisualAnimations();
     setupEventHandlers();
     ScrollTrigger.refresh();

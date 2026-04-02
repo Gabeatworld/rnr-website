@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Command Center",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../../../Command Center/app", "run", "dev"],
+      "port": 8788,
+      "autoPort": false
+    },
+    {
+      "name": "Gabe Portfolio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../Gabe Portfolio/Site", "run", "dev"],
+      "port": 3333,
+      "autoPort": false
+    }
+  ]
+}

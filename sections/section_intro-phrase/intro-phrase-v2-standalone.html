@@ -23,9 +23,26 @@
         display: inline-block;
         white-space: pre;
     }
-    /* Hide feed until intro reveals it */
-    html.has-intro .feed-wrapper-cms {
+    /* Hide feed + nav until intro reveals them */
+    html.has-intro .feed-bg-sticky {
         opacity: 0;
+    }
+    html.has-intro .feed-wrapper {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    html.has-intro .nav_logo,
+    html.has-intro .nav_link {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    /* Bridge class: keeps elements hidden between has-intro removal
+       and GSAP timeline start, preventing a single-frame flash */
+    html.intro-staging .feed-bg-sticky,
+    html.intro-staging .feed-wrapper,
+    html.intro-staging .nav_logo,
+    html.intro-staging .nav_link {
+        opacity: 0 !important;
     }
 </style>
 
@@ -68,11 +85,10 @@
 
         /* ── 3. Timing ── */
         var WORD_STAGGER = 220;
-        var BLUR_START = 14;
+        var BLUR_START = 8;
         var BLUR_DURATION = 600;
         var START_DELAY = 400;
         var HOLD_AFTER = 800;
-        var OVERLAY_FADE = 0.6;
 
         /* ── 4. Build words ── */
         var words = phrase.split(" ");
@@ -102,7 +118,7 @@
             });
         }
 
-        /* ── 5. Play phrase, then fade in feed ── */
+        /* ── 5. Play phrase, then staged reveal ── */
         setTimeout(function () {
             wordEls.forEach(function (el, i) {
                 setTimeout(function () { revealWord(el); }, i * WORD_STAGGER);
@@ -114,7 +130,18 @@
                 HOLD_AFTER;
 
             setTimeout(function () {
-                // Make page-wrapper visible (skip CSS blur transition)
+                if (typeof gsap === "undefined") return;
+
+                var section = document.querySelector(".feed-section");
+                var feedWrapper = section && section.querySelector(".feed-wrapper");
+                var firstProject = section && section.querySelector(".feed-project");
+                var firstSlider = firstProject && firstProject.querySelector(".feed-project-slider");
+                var _navLogo = document.querySelector(".nav_logo");
+                var _navLinks = document.querySelectorAll(".nav_link");
+                var bgSticky = section && section.querySelector(".feed-bg-sticky");
+                var firstBg = bgSticky && bgSticky.querySelector(".feed-background");
+
+                // ── A. Make page-wrapper visible immediately ──
                 var pw = document.querySelector(".page-wrapper");
                 if (pw) {
                     pw.style.transition = "none";
@@ -124,39 +151,95 @@
                     pw.style.transition = "";
                 }
 
-                // Remove has-intro, signal ready
+                // ── B. Bridge class prevents flash during has-intro removal ──
+                document.documentElement.classList.add("intro-staging");
+
+                // ── C. Pin inline styles BEFORE removing has-intro ──
+                if (feedWrapper) gsap.set(feedWrapper, { opacity: 0, y: 8 });
+                if (_navLogo) gsap.set(_navLogo, { opacity: 0, y: 8 });
+                if (_navLinks.length) gsap.set(_navLinks, { opacity: 0, y: 8 });
+
+                // ── D. Set first slide for diagonal mask reveal ──
+                if (firstSlider) {
+                    gsap.set(firstSlider, {
+                        clipPath: "polygon(0% 100%, 0% 100%, 0% 100%, 0% 100%)"
+                    });
+                }
+
+                // ── E. Show bg at full opacity (still hidden under dark overlay) ──
+                if (bgSticky) gsap.set(bgSticky, { opacity: 1 });
+                if (firstBg) gsap.set(firstBg, { opacity: 1 });
+
+                // ── F. Remove has-intro, set ready states ──
                 document.documentElement.classList.add("hero-ready");
                 document.documentElement.classList.remove("has-intro");
                 document.body.classList.add("page-entering");
 
-                // Activate first project for scroll animation
-                var firstProject = document.querySelector(".feed-project");
-                if (firstProject) firstProject.classList.add("is-active");
+                // ── G. Remove bridge class (inline styles are now pinned) ──
+                document.documentElement.offsetHeight;
+                document.documentElement.classList.remove("intro-staging");
 
-                // Signal other scripts
+                // ── H. Signal other scripts ──
                 window.__rnrIntroDone = true;
                 window.dispatchEvent(new CustomEvent("rnr:intro-done"));
 
-                // Fade out overlay
-                overlay.style.transition = "opacity " + OVERLAY_FADE + "s ease-in-out";
+                // ── I. Crossfade: dissolve dark overlay → bg underneath ──
+                overlay.style.transition = "opacity 0.6s ease-in-out";
                 overlay.style.opacity = "0";
                 overlay.addEventListener("transitionend", function () {
                     overlay.remove();
                 });
 
-                // Fade in .feed-wrapper-cms
-                var feedCms = document.querySelector(".feed-wrapper-cms");
-                if (feedCms && typeof gsap !== "undefined") {
-                    gsap.fromTo(feedCms,
-                        { opacity: 0 },
-                        { opacity: 1, duration: 0.6, ease: "power2.out", delay: 0.2 }
-                    );
+                // ── J. Staged reveal timeline ──
+                var tl = gsap.timeline({
+                    delay: 0.35,
+                    defaults: { ease: "power2.out" }
+                });
+
+                // Step 1: Feed wrapper fades in
+                if (feedWrapper) {
+                    tl.to(feedWrapper, { opacity: 1, y: 0, duration: 0.5 }, 0);
                 }
 
-                // Refresh ScrollTrigger after reveal
-                setTimeout(function () {
+                // Step 2: Diagonal mask reveal first slide (bottom-left → top-right)
+                if (firstSlider) {
+                    tl.to(firstSlider, {
+                        clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                        duration: 0.9,
+                        ease: "power3.inOut"
+                    }, 0.25);
+                }
+
+                // Step 3: Nav logo + links
+                var navTargets = [_navLogo].filter(Boolean);
+                if (_navLinks.length) {
+                    navTargets.push.apply(navTargets, Array.from(_navLinks));
+                }
+                if (navTargets.length) {
+                    tl.to(navTargets, {
+                        opacity: 1, y: 0,
+                        duration: 0.5,
+                        stagger: 0.06,
+                    }, 0.15);
+                }
+
+                // Step 4: Activate first project (text reveal + slider + video)
+                tl.call(function () {
+                    if (window.RNR && RNR.feedAnimation) {
+                        RNR.feedAnimation.activateSlide(0);
+                    }
+                }, null, 0.45);
+
+                // Cleanup: clear inline overrides once everything is revealed
+                tl.call(function () {
+                    var allEls = [bgSticky, feedWrapper, _navLogo];
+                    if (_navLinks.length) allEls.push.apply(allEls, Array.from(_navLinks));
+                    allEls.forEach(function (el) {
+                        if (el) gsap.set(el, { clearProps: "filter,willChange,transform,y" });
+                    });
+                    if (firstSlider) gsap.set(firstSlider, { clearProps: "clipPath" });
                     if (typeof ScrollTrigger !== "undefined") ScrollTrigger.refresh();
-                }, 1000);
+                });
             }, totalDuration);
         }, START_DELAY);
     })();

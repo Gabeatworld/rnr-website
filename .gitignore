@@ -5,6 +5,11 @@ Thumbs.db
 # Editors
 .vscode/
 .idea/
+.obsidian/
 
 # Webflow base files
 *.base
+
+# Backups
+_backup_*/
+*.bak_*

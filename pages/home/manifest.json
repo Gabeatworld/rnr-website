@@ -2,11 +2,15 @@
   "page": "home",
   "output": "home.compiled.html",
   "core": "core.js",
-  "css": [],
+  "css": [
+    "modules/feed-styles.css",
+    "modules/awards-footer-pin.css"
+  ],
   "modules": [
     "modules/feed-animation.js",
     "modules/feed-slider.js",
     "modules/image-trail.js",
-    "modules/service-hover.js"
+    "modules/service-hover.js",
+    "modules/awards-footer-pin.js"
   ]
 }

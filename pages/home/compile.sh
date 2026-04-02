@@ -58,3 +58,19 @@ echo "🔨 Compiling → $(basename "$OUTPUT_FILE")"
 } > "$OUTPUT_FILE"
 
 echo "✅ Done → $OUTPUT_FILE ($(wc -c < "$OUTPUT_FILE" | tr -d ' ') bytes)"
+
+# ── Raw JS output (no <script> tags) for Lantern inject ──
+RAW_FILE="${OUTPUT_FILE%.html}.js"
+{
+  cat "$CORE"
+  echo ""
+
+  for f in $MOD_FILES; do
+    echo ""
+    echo "/* ── $(basename "$f") ── */"
+    cat "$DIR/$f"
+    echo ""
+  done
+} > "$RAW_FILE"
+
+echo "✅ Raw  → $(basename "$RAW_FILE") ($(wc -c < "$RAW_FILE" | tr -d ' ') bytes)"

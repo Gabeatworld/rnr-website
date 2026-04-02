@@ -113,6 +113,9 @@ html:not(.hero-ready) [data-animate-hero] {
 <script>
 if (window.location.pathname === '/' || window.location.pathname === '/index' || window.location.pathname === '/index.html') {
   document.documentElement.classList.add('has-intro');
+  // Force scroll to top on homepage — prevents title overlap on refresh
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
 }
 </script>
 <!-- ===========================================

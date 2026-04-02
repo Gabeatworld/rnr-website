@@ -1,8 +1,68 @@
 /* ============================================================
    Module: Feed Styles
-   Mobile / tablet overrides for the feed section.
+   Structural CSS for the feed section — sticky backgrounds,
+   active-state visibility, and responsive overrides.
    ============================================================ */
 
+/* ── Section ─────────────────────────────────────────────── */
+.feed-section {
+  position: relative;
+}
+
+/* ── Sticky background container ─────────────────────────── */
+.feed-bg-sticky {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  margin-top: -50vh;
+  margin-bottom: -50vh;
+}
+
+.feed-bg-sticky .feed-background {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.feed-bg-sticky .feed-background-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.feed-bg-sticky .feed-background-image {
+  width: 100%;
+  height: 130%;
+  object-fit: cover;
+  position: absolute;
+  top: -15%;
+  left: 0;
+  will-change: transform;
+}
+
+/* ── Feed titles — only active project visible ───────────── */
+.feed-project .feed-info {
+  transition: visibility 0s 0.05s;
+}
+
+.feed-project:not(.is-active) .feed-info {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.feed-project.is-active .feed-info {
+  visibility: visible !important;
+}
+
+/* ── Mobile / tablet overrides ───────────────────────────── */
 @media (max-width: 1200px) {
   .feed-project {
     flex-direction: column;
@@ -24,7 +84,6 @@
   }
 }
 
-/* Undo native Webflow tablet styles so they don't double-fire */
 @media (max-width: 991px) {
   .feed-project {
     flex-direction: column;
