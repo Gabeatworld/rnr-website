@@ -257,11 +257,11 @@ RNR.register('feedAnimation', function (shared) {
     if (!stickyContainer) return;
     // Sticky container visible
     gsap.to(stickyContainer, { opacity: 1, duration: 0.3, overwrite: true });
-    // Incoming fades in
+    // Incoming fades in — sits on top of outgoing, no gap
     if (backgrounds[index]) {
       gsap.killTweensOf(backgrounds[index]);
       gsap.to(backgrounds[index], {
-        opacity: 1, duration: 0.5, ease: 'power2.inOut'
+        opacity: 1, duration: 0.6, ease: 'power1.inOut'
       });
     }
   }
@@ -269,8 +269,9 @@ RNR.register('feedAnimation', function (shared) {
   function hideBg(index) {
     if (backgrounds[index]) {
       gsap.killTweensOf(backgrounds[index]);
+      // Delay long enough that incoming is fully opaque before outgoing fades
       gsap.to(backgrounds[index], {
-        opacity: 0, duration: 0.4, delay: 0.3, ease: 'power1.inOut'
+        opacity: 0, duration: 0.3, delay: 0.6, ease: 'power1.in'
       });
     }
   }

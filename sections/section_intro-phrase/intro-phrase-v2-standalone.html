@@ -27,7 +27,12 @@
     html.has-intro .feed-bg-sticky {
         opacity: 0;
     }
-    html.has-intro .feed-wrapper {
+    html.has-intro .feed-info,
+    html.has-intro .feed-project-description {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    html.has-intro .feed_heading {
         opacity: 0;
         transform: translateY(8px);
     }
@@ -36,10 +41,16 @@
         opacity: 0;
         transform: translateY(8px);
     }
+    /* Slider hidden by clipPath, not opacity — wrapper stays visible for mask */
+    html.has-intro .feed-project-slider {
+        clip-path: polygon(0% 100%, 0% 100%, 0% 100%, 0% 100%);
+    }
     /* Bridge class: keeps elements hidden between has-intro removal
        and GSAP timeline start, preventing a single-frame flash */
     html.intro-staging .feed-bg-sticky,
-    html.intro-staging .feed-wrapper,
+    html.intro-staging .feed-info,
+    html.intro-staging .feed-project-description,
+    html.intro-staging .feed_heading,
     html.intro-staging .nav_logo,
     html.intro-staging .nav_link {
         opacity: 0 !important;
@@ -76,7 +87,9 @@
         var isReturn = !!sessionStorage.getItem("rnr-intro-seen");
         var phrases = isReturn ? returnPhrases : newPhrases;
         var lastPhrase = sessionStorage.getItem("rnr-last-phrase");
-        var available = phrases.filter(function (p) { return p !== lastPhrase; });
+        var available = phrases.filter(function (p) {
+            return p !== lastPhrase;
+        });
         var phrase =
             available[Math.floor(Math.random() * available.length)] ||
             phrases[0];
@@ -121,7 +134,9 @@
         /* ── 5. Play phrase, then staged reveal ── */
         setTimeout(function () {
             wordEls.forEach(function (el, i) {
-                setTimeout(function () { revealWord(el); }, i * WORD_STAGGER);
+                setTimeout(function () {
+                    revealWord(el);
+                }, i * WORD_STAGGER);
             });
 
             var totalDuration =
@@ -133,13 +148,30 @@
                 if (typeof gsap === "undefined") return;
 
                 var section = document.querySelector(".feed-section");
-                var feedWrapper = section && section.querySelector(".feed-wrapper");
-                var firstProject = section && section.querySelector(".feed-project");
-                var firstSlider = firstProject && firstProject.querySelector(".feed-project-slider");
+                var feedWrapper =
+                    section && section.querySelector(".feed-wrapper");
+                var firstProject =
+                    section && section.querySelector(".feed-project");
+                var firstSlider =
+                    firstProject &&
+                    firstProject.querySelector(".feed-project-slider");
                 var _navLogo = document.querySelector(".nav_logo");
                 var _navLinks = document.querySelectorAll(".nav_link");
-                var bgSticky = section && section.querySelector(".feed-bg-sticky");
-                var firstBg = bgSticky && bgSticky.querySelector(".feed-background");
+                var bgSticky =
+                    section && section.querySelector(".feed-bg-sticky");
+                var firstBg =
+                    bgSticky && bgSticky.querySelector(".feed-background");
+                var feedHeading = document.querySelector(".feed_heading");
+                var feedInfoEls = firstProject
+                    ? firstProject.querySelectorAll(".feed-info")
+                    : [];
+                var feedDesc =
+                    firstProject &&
+                    firstProject.querySelector(".feed-project-description");
+
+                // ── 0. Force scroll to top so intro always plays from correct position ──
+                window.scrollTo(0, 0);
+                if (window.lenis) window.lenis.scrollTo(0, { immediate: true });
 
                 // ── A. Make page-wrapper visible immediately ──
                 var pw = document.querySelector(".page-wrapper");
@@ -155,14 +187,19 @@
                 document.documentElement.classList.add("intro-staging");
 
                 // ── C. Pin inline styles BEFORE removing has-intro ──
-                if (feedWrapper) gsap.set(feedWrapper, { opacity: 0, y: 8 });
+                // Wrapper visible so clipPath mask is seen; hide text parts separately
+                if (feedWrapper) gsap.set(feedWrapper, { opacity: 1, y: 0 });
+                if (feedInfoEls.length)
+                    gsap.set(feedInfoEls, { opacity: 0, y: 8 });
+                if (feedDesc) gsap.set(feedDesc, { opacity: 0, y: 8 });
+                if (feedHeading) gsap.set(feedHeading, { opacity: 0, y: 8 });
                 if (_navLogo) gsap.set(_navLogo, { opacity: 0, y: 8 });
                 if (_navLinks.length) gsap.set(_navLinks, { opacity: 0, y: 8 });
 
                 // ── D. Set first slide for diagonal mask reveal ──
                 if (firstSlider) {
                     gsap.set(firstSlider, {
-                        clipPath: "polygon(0% 100%, 0% 100%, 0% 100%, 0% 100%)"
+                        clipPath: "polygon(0% 100%, 0% 100%, 0% 100%, 0% 100%)",
                     });
                 }
 
@@ -193,21 +230,42 @@
                 // ── J. Staged reveal timeline ──
                 var tl = gsap.timeline({
                     delay: 0.35,
-                    defaults: { ease: "power2.out" }
+                    defaults: { ease: "power2.out" },
                 });
 
                 // Step 1: Diagonal mask reveal first slide image
                 if (firstSlider) {
-                    tl.to(firstSlider, {
-                        clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
-                        duration: 0.9,
-                        ease: "power3.inOut"
-                    }, 0);
+                    tl.to(
+                        firstSlider,
+                        {
+                            clipPath:
+                                "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                            duration: 1,
+                            ease: "circ.inOut",
+                        },
+                        0,
+                    );
                 }
 
-                // Step 2: Feed wrapper + nav fade in together (after image starts)
-                if (feedWrapper) {
-                    tl.to(feedWrapper, { opacity: 1, y: 0, duration: 0.5 }, 0.4);
+                // Step 2: Feed text + heading + nav fade in together (after image done)
+                if (feedInfoEls.length) {
+                    tl.to(
+                        feedInfoEls,
+                        { opacity: 1, y: 0, duration: 0.5 },
+                        1.15,
+                    );
+                }
+
+                if (feedDesc) {
+                    tl.to(feedDesc, { opacity: 1, y: 0, duration: 0.5 }, 1.15);
+                }
+
+                if (feedHeading) {
+                    tl.to(
+                        feedHeading,
+                        { opacity: 1, y: 0, duration: 0.5 },
+                        1.15,
+                    );
                 }
 
                 var navTargets = [_navLogo].filter(Boolean);
@@ -215,29 +273,52 @@
                     navTargets.push.apply(navTargets, Array.from(_navLinks));
                 }
                 if (navTargets.length) {
-                    tl.to(navTargets, {
-                        opacity: 1, y: 0,
-                        duration: 0.5,
-                        stagger: 0.06,
-                    }, 0.4);
+                    tl.to(
+                        navTargets,
+                        {
+                            opacity: 1,
+                            y: 0,
+                            duration: 0.5,
+                            stagger: 0.06,
+                        },
+                        1.15,
+                    );
                 }
 
                 // Step 3: Activate first project (text reveal + slider + video)
-                tl.call(function () {
-                    if (window.RNR && RNR.feedAnimation) {
-                        RNR.feedAnimation.activateSlide(0);
-                    }
-                }, null, 0.55);
+                tl.call(
+                    function () {
+                        if (window.RNR && RNR.feedAnimation) {
+                            RNR.feedAnimation.activateSlide(0);
+                        }
+                    },
+                    null,
+                    1.3,
+                );
 
                 // Cleanup: clear inline overrides once everything is revealed
                 tl.call(function () {
-                    var allEls = [bgSticky, feedWrapper, _navLogo];
-                    if (_navLinks.length) allEls.push.apply(allEls, Array.from(_navLinks));
+                    var allEls = [
+                        bgSticky,
+                        feedWrapper,
+                        feedDesc,
+                        feedHeading,
+                        _navLogo,
+                    ];
+                    if (feedInfoEls.length)
+                        allEls.push.apply(allEls, Array.from(feedInfoEls));
+                    if (_navLinks.length)
+                        allEls.push.apply(allEls, Array.from(_navLinks));
                     allEls.forEach(function (el) {
-                        if (el) gsap.set(el, { clearProps: "filter,willChange,transform,y" });
+                        if (el)
+                            gsap.set(el, {
+                                clearProps: "filter,willChange,transform,y",
+                            });
                     });
-                    if (firstSlider) gsap.set(firstSlider, { clearProps: "clipPath" });
-                    if (typeof ScrollTrigger !== "undefined") ScrollTrigger.refresh();
+                    if (firstSlider)
+                        gsap.set(firstSlider, { clearProps: "clipPath" });
+                    if (typeof ScrollTrigger !== "undefined")
+                        ScrollTrigger.refresh();
                 });
             }, totalDuration);
         }, START_DELAY);
