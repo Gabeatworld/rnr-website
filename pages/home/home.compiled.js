@@ -124,7 +124,7 @@ RNR.register('feedAnimation', function (shared) {
       gsap.killTweensOf(backgrounds[index]);
       // Delay long enough that incoming is fully opaque before outgoing fades
       gsap.to(backgrounds[index], {
-        opacity: 0, duration: 0.3, delay: 0.6, ease: 'power1.in'
+        opacity: 0, duration: 0.6, delay: 0.6, ease: 'power1.in'
       });
     }
   }
