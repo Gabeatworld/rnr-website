@@ -196,21 +196,20 @@
                     defaults: { ease: "power2.out" }
                 });
 
-                // Step 1: Feed wrapper fades in
-                if (feedWrapper) {
-                    tl.to(feedWrapper, { opacity: 1, y: 0, duration: 0.5 }, 0);
-                }
-
-                // Step 2: Diagonal mask reveal first slide (bottom-left → top-right)
+                // Step 1: Diagonal mask reveal first slide image
                 if (firstSlider) {
                     tl.to(firstSlider, {
                         clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
                         duration: 0.9,
                         ease: "power3.inOut"
-                    }, 0.25);
+                    }, 0);
                 }
 
-                // Step 3: Nav logo + links
+                // Step 2: Feed wrapper + nav fade in together (after image starts)
+                if (feedWrapper) {
+                    tl.to(feedWrapper, { opacity: 1, y: 0, duration: 0.5 }, 0.4);
+                }
+
                 var navTargets = [_navLogo].filter(Boolean);
                 if (_navLinks.length) {
                     navTargets.push.apply(navTargets, Array.from(_navLinks));
@@ -220,15 +219,15 @@
                         opacity: 1, y: 0,
                         duration: 0.5,
                         stagger: 0.06,
-                    }, 0.15);
+                    }, 0.4);
                 }
 
-                // Step 4: Activate first project (text reveal + slider + video)
+                // Step 3: Activate first project (text reveal + slider + video)
                 tl.call(function () {
                     if (window.RNR && RNR.feedAnimation) {
                         RNR.feedAnimation.activateSlide(0);
                     }
-                }, null, 0.45);
+                }, null, 0.55);
 
                 // Cleanup: clear inline overrides once everything is revealed
                 tl.call(function () {
