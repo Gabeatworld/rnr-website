@@ -9,7 +9,7 @@
   'use strict';
 
   const RNR = (window.RNR = window.RNR || {});
-  RNR.version = '8dbb4b7';
+  RNR.version = '330b2d4';
 
   // ── Module registry ──────────────────────────────────────
   const _modules = [];
@@ -1100,12 +1100,12 @@ RNR.register('awardsFooterPin', function (/* shared */) {
         invalidateOnRefresh: true,
         onUpdate: function (self) {
           var p = self.progress;
-          if (p >= 0.32 && !spinStarted) {
+          if (p >= 0.24 && !spinStarted) {
             startSpin();
-          } else if (p < 0.30 && spinStarted) {
+          } else if (p < 0.22 && spinStarted) {
             stopSpin();
           }
-          if (p > 0.38 && spinStarted) {
+          if (p > 0.30 && spinStarted) {
             var sensitivity = window.innerWidth < 991 ? 400 : 200;
             updateSpinSpeed(self.getVelocity() / sensitivity);
           }
@@ -1147,7 +1147,7 @@ RNR.register('awardsFooterPin', function (/* shared */) {
       }, 0);
     });
 
-    // PHASE 2: Awards stagger OUT — tightened (0.06 → 0.26)
+    // PHASE 2: Awards stagger OUT (0.06 → 0.19)
     if (aLogos) {
       tl.to(aLogos, {
         opacity: 0, y: -20, filter: 'blur(4px)',
@@ -1160,7 +1160,6 @@ RNR.register('awardsFooterPin', function (/* shared */) {
         duration: 0.06, ease: 'power2.in'
       }, 0.10);
     }
-    // Numeral exits after countup completes (0.10)
     if (aNumeral) {
       tl.to(aNumeral, {
         opacity: 0, y: -15, filter: 'blur(4px)',
@@ -1174,22 +1173,22 @@ RNR.register('awardsFooterPin', function (/* shared */) {
       }, 0.16);
     }
 
-    // PHASE 3: Crossfade BG + awards fade (0.20 → 0.34)
+    // PHASE 3: Crossfade BG + awards fade (0.16 → 0.28) — tightened, overlaps with phase 2
     tl.to(wrapper, {
       backgroundColor: '#1a1a1a',
-      duration: 0.14, ease: 'power1.inOut'
-    }, 0.20);
+      duration: 0.12, ease: 'power1.inOut'
+    }, 0.16);
 
-    tl.to(awards, { autoAlpha: 0, duration: 0.10, ease: 'power1.in' }, 0.20);
+    tl.to(awards, { autoAlpha: 0, duration: 0.08, ease: 'power1.in' }, 0.18);
 
-    // PHASE 4 + 5: Footer heading + images bloom together (0.32 → 0.50)
-    tl.to(footer, { autoAlpha: 1, duration: 0.04 }, 0.32);
+    // PHASE 4 + 5: Footer appears as BG goes dark (0.24 → 0.40) — no dead zone
+    tl.to(footer, { autoAlpha: 1, duration: 0.04 }, 0.24);
 
     if (fHeading) {
       tl.to(fHeading, {
         opacity: 1, y: 0,
         duration: 0.12, ease: 'power2.out'
-      }, 0.34);
+      }, 0.26);
     }
 
     tl.to(fImages, {
@@ -1197,10 +1196,10 @@ RNR.register('awardsFooterPin', function (/* shared */) {
       duration: 0.14,
       ease: 'back.out(1.2)',
       stagger: { each: 0.003, from: 'start' }
-    }, 0.32);
+    }, 0.24);
 
-    // PHASE 6: Hold for spin viewing (0.50 → 1.0)
-    tl.to({}, { duration: 0.50 }, 0.50);
+    // PHASE 6: Hold for spin viewing (0.40 → 1.0)
+    tl.to({}, { duration: 0.60 }, 0.40);
   };
 
   // ── Boot — wait for carousel images + intro ───────────────
