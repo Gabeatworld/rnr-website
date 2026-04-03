@@ -300,7 +300,7 @@ RNR.register('awardsFooterPin', function (/* shared */) {
     tl.to({}, { duration: 0.50 }, 0.50);
   };
 
-  // ── Boot — wait for carousel images ───────────────────────
+  // ── Boot — wait for carousel images + intro ───────────────
   var imgEls = fImages.map(function (el) {
     return el.querySelector('img') || el;
   });
@@ -308,24 +308,49 @@ RNR.register('awardsFooterPin', function (/* shared */) {
     return el.tagName === 'IMG' && !el.complete;
   });
 
+  var booted = false;
+  var imagesReady = !pending.length;
+  var introReady = !document.documentElement.classList.contains('has-intro') || window.__rnrIntroDone;
+
   var boot = function () {
+    if (booted || !imagesReady || !introReady) return;
+    booted = true;
+    // Re-kill any STs the global system may have created after our init
+    ScrollTrigger.getAll().forEach(function (st) {
+      if (!st.trigger) return;
+      if (st.trigger === awards || awards.contains(st.trigger) ||
+          st.trigger === footer || (st.pin && st.pin === footer)) {
+        st.kill();
+      }
+    });
     buildTimeline();
     ScrollTrigger.refresh();
   };
 
   if (pending.length) {
     var loaded = 0;
-    var check = function () { if (++loaded >= pending.length) boot(); };
+    var check = function () {
+      if (++loaded >= pending.length) { imagesReady = true; boot(); }
+    };
     pending.forEach(function (img) {
       img.addEventListener('load', check, { once: true });
       img.addEventListener('error', check, { once: true });
     });
     setTimeout(function () {
-      if (loaded < pending.length) { loaded = pending.length; boot(); }
+      if (!imagesReady) { imagesReady = true; boot(); }
     }, 3000);
-  } else {
-    boot();
   }
+
+  // On homepage: wait for intro to finish before building the pin
+  if (!introReady) {
+    window.addEventListener('rnr:intro-done', function () {
+      introReady = true;
+      boot();
+    }, { once: true });
+  }
+
+  // If both are already ready, boot now
+  boot();
 
   // ── Scroll end — ease spin back ───────────────────────────
   ScrollTrigger.addEventListener('scrollEnd', function () {
