@@ -221,15 +221,8 @@ RNR.register('awardsFooterPin', function (/* shared */) {
 
     var tl = mainTl;
 
-    // PHASE 1: Numeral blur-reveal + countup (0 → 0.12)
-    // Numeral materialises through blur while numbers tick up underneath
-    if (aNumeral) {
-      tl.fromTo(aNumeral,
-        { opacity: 0, filter: 'blur(12px)' },
-        { opacity: 1, filter: 'blur(0px)', duration: 0.06, ease: 'power2.out' },
-        0
-      );
-    }
+    // PHASE 1: Countup (0 → 0.10)
+    // Numeral is already visible (set in initial states) — just count up
 
     countupProxies.forEach(function (d) {
       tl.fromTo(d, { val: 0 }, {
