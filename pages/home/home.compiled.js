@@ -9,7 +9,7 @@
   'use strict';
 
   const RNR = (window.RNR = window.RNR || {});
-  RNR.version = '54a2f4a';
+  RNR.version = '2cc37f9';
 
   // ── Module registry ──────────────────────────────────────
   const _modules = [];
@@ -1200,69 +1200,56 @@ RNR.register('awardsFooterPin', function (/* shared */) {
     tl.to({}, { duration: 0.35 }, 0.65);
   };
 
-  // ── Boot — wait for carousel images + intro ───────────────
+  // ── Boot ───────────────────────────────────────────────────
+  // Build the timeline IMMEDIATELY so the pin spacer exists from
+  // the start — this keeps document height correct for Lenis and
+  // native scroll. If intro is playing, rebuild after it finishes
+  // to get accurate measurements once the overlay is gone.
+
+  var killConflictingSTs = function () {
+    ScrollTrigger.getAll().forEach(function (st) {
+      if (!st.trigger) return;
+      if (st.trigger === awards || awards.contains(st.trigger) ||
+          st.trigger === footer || (st.pin && st.pin === footer)) {
+        st.kill();
+      }
+    });
+  };
+
+  // Build now — pin spacer is created, document height is correct
+  killConflictingSTs();
+  buildTimeline();
+
+  // If intro is playing, rebuild after it finishes with correct measurements
+  var hasIntro = document.documentElement.classList.contains('has-intro') && !window.__rnrIntroDone;
+  if (hasIntro) {
+    window.addEventListener('rnr:intro-done', function () {
+      // Wait for intro overlay removal + layout settle
+      setTimeout(function () {
+        killConflictingSTs();
+        buildTimeline();
+        ScrollTrigger.refresh();
+      }, 200);
+    }, { once: true });
+  }
+
+  // Also refresh after images load (affects carousel sizing)
   var imgEls = fImages.map(function (el) {
     return el.querySelector('img') || el;
   });
   var pending = imgEls.filter(function (el) {
     return el.tagName === 'IMG' && !el.complete;
   });
-
-  var booted = false;
-  var imagesReady = !pending.length;
-  var introReady = !document.documentElement.classList.contains('has-intro') || window.__rnrIntroDone;
-
-  var boot = function () {
-    if (booted || !imagesReady || !introReady) return;
-    booted = true;
-
-    var doBoot = function () {
-      // Re-kill any STs the global system may have created after our init
-      ScrollTrigger.getAll().forEach(function (st) {
-        if (!st.trigger) return;
-        if (st.trigger === awards || awards.contains(st.trigger) ||
-            st.trigger === footer || (st.pin && st.pin === footer)) {
-          st.kill();
-        }
-      });
-      buildTimeline();
-      // Double-refresh: once now, once after a frame to catch layout shifts
-      ScrollTrigger.refresh();
-      requestAnimationFrame(function () { ScrollTrigger.refresh(); });
-    };
-
-    // If intro just finished, wait for layout to settle (overlay removal, scroll unlock)
-    if (document.documentElement.classList.contains('has-intro')) {
-      requestAnimationFrame(function () { setTimeout(doBoot, 100); });
-    } else {
-      doBoot();
-    }
-  };
-
   if (pending.length) {
     var loaded = 0;
     var check = function () {
-      if (++loaded >= pending.length) { imagesReady = true; boot(); }
+      if (++loaded >= pending.length) ScrollTrigger.refresh();
     };
     pending.forEach(function (img) {
       img.addEventListener('load', check, { once: true });
       img.addEventListener('error', check, { once: true });
     });
-    setTimeout(function () {
-      if (!imagesReady) { imagesReady = true; boot(); }
-    }, 3000);
   }
-
-  // On homepage: wait for intro to finish before building the pin
-  if (!introReady) {
-    window.addEventListener('rnr:intro-done', function () {
-      introReady = true;
-      boot();
-    }, { once: true });
-  }
-
-  // If both are already ready, boot now
-  boot();
 
   // ── Scroll end — ease spin back ───────────────────────────
   ScrollTrigger.addEventListener('scrollEnd', function () {
