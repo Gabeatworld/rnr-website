@@ -9,6 +9,7 @@
   'use strict';
 
   const RNR = (window.RNR = window.RNR || {});
+  RNR.version = '0a622f0';
 
   // ── Module registry ──────────────────────────────────────
   const _modules = [];
@@ -50,7 +51,7 @@
     });
 
     console.log(
-      `[RNR] ${_modules.length} module(s) initialised:`,
+      `[RNR] v${RNR.version} — ${_modules.length} module(s):`,
       _modules.map((m) => m.name).join(', ')
     );
   });
