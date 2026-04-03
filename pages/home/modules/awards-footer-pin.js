@@ -36,18 +36,36 @@ RNR.register('awardsFooterPin', function (/* shared */) {
   if (!fCarousel || !fImages.length) return null;
 
   // ── Countup hijack ────────────────────────────────────────
-  // Remove data-countup attrs so the standalone embed never fires.
-  // We drive the numbers via the scrubbed timeline instead.
-  var countupProxies = Array.from(awards.querySelectorAll('[data-countup]')).map(function (el) {
+  // Remove data-countup so the standalone embed never fires.
+  // We run the countup as a standalone ScrollTrigger (not scrubbed).
+  var countupEls = Array.from(awards.querySelectorAll('[data-countup]'));
+  var countupTargets = countupEls.map(function (el) {
     var attrVal = el.getAttribute('data-countup') || '';
-    var rawText  = el.textContent.trim();
-    // Attribute may hold the number, or may just be a hook — fall back to textContent
+    var rawText = el.textContent.trim();
     var numFromAttr = parseFloat(attrVal.replace(/[^0-9.]/g, ''));
     var target = (numFromAttr > 0 ? numFromAttr : parseFloat(rawText.replace(/[^0-9.]/g, ''))) || 0;
     var suffix = rawText.replace(/^[\d,.\s]+/, '');
     el.removeAttribute('data-countup');
-    return { el: el, target: target, val: 0, suffix: suffix };
+    return { el: el, target: target, suffix: suffix };
   });
+
+  // Countup fires once when awards section enters viewport (not scrubbed)
+  var countupFired = false;
+  var fireCountup = function () {
+    if (countupFired) return;
+    countupFired = true;
+    countupTargets.forEach(function (d) {
+      var proxy = { val: 0 };
+      gsap.to(proxy, {
+        val: d.target,
+        duration: 1.8,
+        ease: 'power2.out',
+        onUpdate: function () {
+          d.el.textContent = Math.round(proxy.val) + (d.suffix || '');
+        }
+      });
+    });
+  };
 
   // ── Kill conflicting ScrollTriggers on awards + footer ─────
   // The global animation system (setupVisualAnimations / setupSplitAnimations)
@@ -195,6 +213,7 @@ RNR.register('awardsFooterPin', function (/* shared */) {
         scrub: isMobile ? 0.8 : 0.5,
         anticipatePin: isMobile ? 0 : 1,
         invalidateOnRefresh: true,
+        onEnter: fireCountup,
         onUpdate: function (self) {
           var p = self.progress;
           if (p >= 0.50 && !spinStarted) {
@@ -293,16 +312,28 @@ RNR.register('awardsFooterPin', function (/* shared */) {
   var boot = function () {
     if (booted || !imagesReady || !introReady) return;
     booted = true;
-    // Re-kill any STs the global system may have created after our init
-    ScrollTrigger.getAll().forEach(function (st) {
-      if (!st.trigger) return;
-      if (st.trigger === awards || awards.contains(st.trigger) ||
-          st.trigger === footer || (st.pin && st.pin === footer)) {
-        st.kill();
-      }
-    });
-    buildTimeline();
-    ScrollTrigger.refresh();
+
+    var doBoot = function () {
+      // Re-kill any STs the global system may have created after our init
+      ScrollTrigger.getAll().forEach(function (st) {
+        if (!st.trigger) return;
+        if (st.trigger === awards || awards.contains(st.trigger) ||
+            st.trigger === footer || (st.pin && st.pin === footer)) {
+          st.kill();
+        }
+      });
+      buildTimeline();
+      // Double-refresh: once now, once after a frame to catch layout shifts
+      ScrollTrigger.refresh();
+      requestAnimationFrame(function () { ScrollTrigger.refresh(); });
+    };
+
+    // If intro just finished, wait for layout to settle (overlay removal, scroll unlock)
+    if (document.documentElement.classList.contains('has-intro')) {
+      requestAnimationFrame(function () { setTimeout(doBoot, 100); });
+    } else {
+      doBoot();
+    }
   };
 
   if (pending.length) {
