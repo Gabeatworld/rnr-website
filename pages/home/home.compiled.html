@@ -156,7 +156,7 @@
   'use strict';
 
   const RNR = (window.RNR = window.RNR || {});
-  RNR.version = '6dce756';
+  RNR.version = '7aa6150';
 
   // ── Module registry ──────────────────────────────────────
   const _modules = [];
@@ -1240,19 +1240,19 @@ RNR.register('awardsFooterPin', function (/* shared */) {
       scrollTrigger: {
         trigger: wrapper,
         start: 'top top',
-        end: isMobile ? '+=150%' : '+=200%',
+        end: isMobile ? '+=100%' : '+=120%',
         pin: true,
-        scrub: isMobile ? 1 : 0.6,
+        scrub: isMobile ? 0.8 : 0.5,
         anticipatePin: isMobile ? 0 : 1,
         invalidateOnRefresh: true,
         onUpdate: function (self) {
           var p = self.progress;
-          if (p >= 0.24 && !spinStarted) {
+          if (p >= 0.50 && !spinStarted) {
             startSpin();
-          } else if (p < 0.22 && spinStarted) {
+          } else if (p < 0.48 && spinStarted) {
             stopSpin();
           }
-          if (p > 0.30 && spinStarted) {
+          if (p > 0.55 && spinStarted) {
             var sensitivity = window.innerWidth < 991 ? 400 : 200;
             updateSpinSpeed(self.getVelocity() / sensitivity);
           }
@@ -1272,61 +1272,60 @@ RNR.register('awardsFooterPin', function (/* shared */) {
     var tl = mainTl;
 
     // Numeral keeps its HTML value (e.g. "9") — no scrubbed countup.
-    // Scrubbed fromTo was forcing textContent to "0" at progress 0.
 
-    // PHASE 1: Awards stagger OUT (0.06 → 0.19)
+    // PHASE 1: Awards stagger OUT (0 → 0.30)
     if (aLogos) {
       tl.to(aLogos, {
         opacity: 0, y: -20, filter: 'blur(4px)',
-        duration: 0.06, ease: 'power2.in'
-      }, 0.06);
+        duration: 0.08, ease: 'power2.in'
+      }, 0.02);
     }
     if (aSubtext) {
       tl.to(aSubtext, {
         opacity: 0, y: -15, filter: 'blur(4px)',
-        duration: 0.06, ease: 'power2.in'
-      }, 0.10);
+        duration: 0.08, ease: 'power2.in'
+      }, 0.06);
     }
     if (aNumeral) {
       tl.to(aNumeral, {
         opacity: 0, y: -15, filter: 'blur(4px)',
-        duration: 0.06, ease: 'power2.in'
-      }, 0.13);
+        duration: 0.08, ease: 'power2.in'
+      }, 0.10);
     }
     if (aHeading) {
       tl.to(aHeading, {
         opacity: 0, y: -25, filter: 'blur(8px)',
-        duration: 0.07, ease: 'power2.in'
-      }, 0.16);
+        duration: 0.10, ease: 'power2.in'
+      }, 0.14);
     }
 
-    // PHASE 3: Crossfade BG + awards fade (0.16 → 0.28) — tightened, overlaps with phase 2
+    // PHASE 2: Crossfade BG + awards fade (0.20 → 0.40)
     tl.to(wrapper, {
       backgroundColor: '#1a1a1a',
-      duration: 0.12, ease: 'power1.inOut'
-    }, 0.16);
+      duration: 0.20, ease: 'power1.inOut'
+    }, 0.20);
 
-    tl.to(awards, { autoAlpha: 0, duration: 0.08, ease: 'power1.in' }, 0.18);
+    tl.to(awards, { autoAlpha: 0, duration: 0.12, ease: 'power1.in' }, 0.25);
 
-    // PHASE 4 + 5: Footer appears as BG goes dark (0.24 → 0.40) — no dead zone
-    tl.to(footer, { autoAlpha: 1, duration: 0.04 }, 0.24);
+    // PHASE 3: Footer appears (0.40 → 0.65)
+    tl.to(footer, { autoAlpha: 1, duration: 0.06 }, 0.40);
 
     if (fHeading) {
       tl.to(fHeading, {
         opacity: 1, y: 0,
-        duration: 0.12, ease: 'power2.out'
-      }, 0.26);
+        duration: 0.15, ease: 'power2.out'
+      }, 0.42);
     }
 
     tl.to(fImages, {
       scale: 1, opacity: 1,
-      duration: 0.14,
+      duration: 0.20,
       ease: 'back.out(1.2)',
-      stagger: { each: 0.003, from: 'start' }
-    }, 0.24);
+      stagger: { each: 0.005, from: 'start' }
+    }, 0.45);
 
-    // PHASE 6: Hold for spin viewing (0.40 → 1.0)
-    tl.to({}, { duration: 0.60 }, 0.40);
+    // PHASE 4: Hold for spin viewing (0.65 → 1.0)
+    tl.to({}, { duration: 0.35 }, 0.65);
   };
 
   // ── Boot — wait for carousel images + intro ───────────────
