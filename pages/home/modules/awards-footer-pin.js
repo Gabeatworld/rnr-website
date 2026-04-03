@@ -185,14 +185,15 @@ RNR.register('awardsFooterPin', function (/* shared */) {
       positionImages();
     }
 
+    var isMobile = window.innerWidth <= 768;
     mainTl = gsap.timeline({
       scrollTrigger: {
         trigger: wrapper,
         start: 'top top',
-        end: '+=200%',
+        end: isMobile ? '+=150%' : '+=200%',
         pin: true,
-        scrub: 0.6,
-        anticipatePin: 1,
+        scrub: isMobile ? 1 : 0.6,
+        anticipatePin: isMobile ? 0 : 1,
         invalidateOnRefresh: true,
         onUpdate: function (self) {
           var p = self.progress;

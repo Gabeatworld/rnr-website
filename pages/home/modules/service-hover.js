@@ -6,6 +6,9 @@
    ============================================================ */
 
 RNR.register('serviceHover', function (/* shared */) {
+  // Disable entirely on mobile/tablet — hover interactions don't apply
+  if (window.innerWidth <= 768) return null;
+
   const serviceList = document.querySelector('.service-list');
   if (!serviceList || !window.gsap) return null;
 

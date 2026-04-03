@@ -75,10 +75,11 @@ RNR.register('feedAnimation', function (shared) {
   gsap.registerPlugin(ScrollTrigger, SplitText);
 
   // ── Config ───────────────────────────────────────────────
+  const isMobile = window.innerWidth <= 768;
   const TEXT = {
     duration:  1.1,
     stagger:   0.2,
-    blurStart: 10,
+    blurStart: isMobile ? 0 : 10,
     delay:     0.05,
     ease:      'power2.out',
   };
@@ -137,8 +138,9 @@ RNR.register('feedAnimation', function (shared) {
     if (stickyContainer) gsap.set(stickyContainer, { opacity: 0 });
   }
 
-  // ── Parallax ─────────────────────────────────────────────
+  // ── Parallax (desktop only — scrubbed STs are expensive on mobile) ──
   function createParallax() {
+    if (window.innerWidth <= 768) return;
     projects.forEach(function (slide, i) {
       var bg = backgrounds[i];
       if (!bg) return;
@@ -173,8 +175,8 @@ RNR.register('feedAnimation', function (shared) {
     if (words.length) {
       gsap.set(words, {
         opacity: 0,
-        filter: `blur(${TEXT.blurStart}px)`,
-        willChange: 'transform, opacity, filter',
+        filter: TEXT.blurStart ? `blur(${TEXT.blurStart}px)` : 'none',
+        willChange: TEXT.blurStart ? 'transform, opacity, filter' : 'transform, opacity',
       });
     }
   });
@@ -750,6 +752,9 @@ RNR.register('imageTrail', function (/* shared */) {
    ============================================================ */
 
 RNR.register('serviceHover', function (/* shared */) {
+  // Disable entirely on mobile/tablet — hover interactions don't apply
+  if (window.innerWidth <= 768) return null;
+
   const serviceList = document.querySelector('.service-list');
   if (!serviceList || !window.gsap) return null;
 
@@ -1082,14 +1087,15 @@ RNR.register('awardsFooterPin', function (/* shared */) {
       positionImages();
     }
 
+    var isMobile = window.innerWidth <= 768;
     mainTl = gsap.timeline({
       scrollTrigger: {
         trigger: wrapper,
         start: 'top top',
-        end: '+=200%',
+        end: isMobile ? '+=150%' : '+=200%',
         pin: true,
-        scrub: 0.6,
-        anticipatePin: 1,
+        scrub: isMobile ? 1 : 0.6,
+        anticipatePin: isMobile ? 0 : 1,
         invalidateOnRefresh: true,
         onUpdate: function (self) {
           var p = self.progress;
