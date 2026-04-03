@@ -9,7 +9,7 @@
   'use strict';
 
   const RNR = (window.RNR = window.RNR || {});
-  RNR.version = '238dbf1';
+  RNR.version = '1412542';
 
   // ── Module registry ──────────────────────────────────────
   const _modules = [];
@@ -1099,8 +1099,9 @@ RNR.register('awardsFooterPin', function (/* shared */) {
         anticipatePin: isMobile ? 0 : 1,
         invalidateOnRefresh: true,
         onEnter: function () {
-          // Zero the countup text when pin starts — not before
+          // Set countup start values — blur hides the snap
           countupProxies.forEach(function (d) {
+            d.val = 0;
             d.el.textContent = '0' + (d.suffix || '');
           });
         },
@@ -1130,8 +1131,17 @@ RNR.register('awardsFooterPin', function (/* shared */) {
 
     var tl = mainTl;
 
+    // Numeral blur-reveal: fades in from blur while countup runs.
+    // Hides the "0" snap naturally — by the time it's readable, count is rolling.
+    if (aNumeral) {
+      tl.fromTo(aNumeral,
+        { opacity: 0, filter: 'blur(16px)' },
+        { opacity: 1, filter: 'blur(0px)', duration: 0.12, ease: 'power2.out', immediateRender: false },
+        0
+      );
+    }
+
     // Countup: scrubbed 0 → target over first 15% of scroll.
-    // immediateRender:false keeps HTML text until pin activates.
     countupProxies.forEach(function (d) {
       tl.fromTo(d, { val: 0 }, {
         val: d.target,
