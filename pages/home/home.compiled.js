@@ -9,7 +9,7 @@
   'use strict';
 
   const RNR = (window.RNR = window.RNR || {});
-  RNR.version = '2cc37f9';
+  RNR.version = '238dbf1';
 
   // ── Module registry ──────────────────────────────────────
   const _modules = [];
@@ -940,35 +940,17 @@ RNR.register('awardsFooterPin', function (/* shared */) {
 
   // ── Countup hijack ────────────────────────────────────────
   // Remove data-countup so the standalone embed never fires.
-  // We run the countup as a standalone ScrollTrigger (not scrubbed).
-  var countupEls = Array.from(awards.querySelectorAll('[data-countup]'));
-  var countupTargets = countupEls.map(function (el) {
+  // Countup is scrubbed in the pin timeline with immediateRender:false
+  // so textContent stays at the HTML value until the pin activates.
+  var countupProxies = Array.from(awards.querySelectorAll('[data-countup]')).map(function (el) {
     var attrVal = el.getAttribute('data-countup') || '';
     var rawText = el.textContent.trim();
     var numFromAttr = parseFloat(attrVal.replace(/[^0-9.]/g, ''));
     var target = (numFromAttr > 0 ? numFromAttr : parseFloat(rawText.replace(/[^0-9.]/g, ''))) || 0;
     var suffix = rawText.replace(/^[\d,.\s]+/, '');
     el.removeAttribute('data-countup');
-    return { el: el, target: target, suffix: suffix };
+    return { el: el, target: target, val: 0, suffix: suffix };
   });
-
-  // Countup fires once when awards section enters viewport (not scrubbed)
-  var countupFired = false;
-  var fireCountup = function () {
-    if (countupFired) return;
-    countupFired = true;
-    countupTargets.forEach(function (d) {
-      var proxy = { val: 0 };
-      gsap.to(proxy, {
-        val: d.target,
-        duration: 1.8,
-        ease: 'power2.out',
-        onUpdate: function () {
-          d.el.textContent = Math.round(proxy.val) + (d.suffix || '');
-        }
-      });
-    });
-  };
 
   // ── Kill conflicting ScrollTriggers on awards + footer ─────
   // The global animation system (setupVisualAnimations / setupSplitAnimations)
@@ -1116,7 +1098,12 @@ RNR.register('awardsFooterPin', function (/* shared */) {
         scrub: isMobile ? 0.8 : 0.5,
         anticipatePin: isMobile ? 0 : 1,
         invalidateOnRefresh: true,
-        onEnter: fireCountup,
+        onEnter: function () {
+          // Zero the countup text when pin starts — not before
+          countupProxies.forEach(function (d) {
+            d.el.textContent = '0' + (d.suffix || '');
+          });
+        },
         onUpdate: function (self) {
           var p = self.progress;
           if (p >= 0.50 && !spinStarted) {
@@ -1143,9 +1130,23 @@ RNR.register('awardsFooterPin', function (/* shared */) {
 
     var tl = mainTl;
 
-    // Numeral keeps its HTML value (e.g. "9") — no scrubbed countup.
+    // Countup: scrubbed 0 → target over first 15% of scroll.
+    // immediateRender:false keeps HTML text until pin activates.
+    countupProxies.forEach(function (d) {
+      tl.fromTo(d, { val: 0 }, {
+        val: d.target,
+        duration: 0.15,
+        ease: 'power2.out',
+        immediateRender: false,
+        onUpdate: (function (data) {
+          return function () {
+            data.el.textContent = Math.round(data.val) + (data.suffix || '');
+          };
+        })(d)
+      }, 0);
+    });
 
-    // PHASE 1: Awards stagger OUT (0 → 0.30)
+    // PHASE 1: Awards stagger OUT (0.10 → 0.30)
     if (aLogos) {
       tl.to(aLogos, {
         opacity: 0, y: -20, filter: 'blur(4px)',
@@ -1162,13 +1163,13 @@ RNR.register('awardsFooterPin', function (/* shared */) {
       tl.to(aNumeral, {
         opacity: 0, y: -15, filter: 'blur(4px)',
         duration: 0.08, ease: 'power2.in'
-      }, 0.10);
+      }, 0.16);
     }
     if (aHeading) {
       tl.to(aHeading, {
         opacity: 0, y: -25, filter: 'blur(8px)',
         duration: 0.10, ease: 'power2.in'
-      }, 0.14);
+      }, 0.18);
     }
 
     // PHASE 2: Crossfade BG + awards fade (0.20 → 0.40)
