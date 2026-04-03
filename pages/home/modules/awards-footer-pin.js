@@ -46,7 +46,6 @@ RNR.register('awardsFooterPin', function (/* shared */) {
     var target = (numFromAttr > 0 ? numFromAttr : parseFloat(rawText.replace(/[^0-9.]/g, ''))) || 0;
     var suffix = rawText.replace(/^[\d,.\s]+/, '');
     el.removeAttribute('data-countup');
-    console.log('[awards] countup — attr:', attrVal, 'text:', rawText, 'target:', target);
     return { el: el, target: target, val: 0, suffix: suffix };
   });
 
@@ -198,10 +197,6 @@ RNR.register('awardsFooterPin', function (/* shared */) {
         invalidateOnRefresh: true,
         onUpdate: function (self) {
           var p = self.progress;
-          if (!self._logged05 && p > 0.05) { self._logged05 = true; console.log('[awards] progress 5%'); }
-          if (!self._logged20 && p > 0.20) { self._logged20 = true; console.log('[awards] progress 20%'); }
-          if (!self._logged40 && p > 0.40) { self._logged40 = true; console.log('[awards] progress 40%'); }
-          if (!self._logged60 && p > 0.60) { self._logged60 = true; console.log('[awards] progress 60%'); }
           if (p >= 0.24 && !spinStarted) {
             startSpin();
           } else if (p < 0.22 && spinStarted) {
@@ -226,23 +221,10 @@ RNR.register('awardsFooterPin', function (/* shared */) {
 
     var tl = mainTl;
 
-    // PHASE 1: Countup (0 → 0.10)
-    // Numeral is already visible (set in initial states) — just count up
+    // Numeral keeps its HTML value (e.g. "9") — no scrubbed countup.
+    // Scrubbed fromTo was forcing textContent to "0" at progress 0.
 
-    countupProxies.forEach(function (d) {
-      tl.fromTo(d, { val: 0 }, {
-        val: d.target,
-        duration: 0.10,
-        ease: 'none',
-        onUpdate: (function (data) {
-          return function () {
-            data.el.textContent = Math.round(data.val) + (data.suffix || '');
-          };
-        })(d)
-      }, 0);
-    });
-
-    // PHASE 2: Awards stagger OUT (0.06 → 0.19)
+    // PHASE 1: Awards stagger OUT (0.06 → 0.19)
     if (aLogos) {
       tl.to(aLogos, {
         opacity: 0, y: -20, filter: 'blur(4px)',
@@ -312,7 +294,6 @@ RNR.register('awardsFooterPin', function (/* shared */) {
   var boot = function () {
     if (booted || !imagesReady || !introReady) return;
     booted = true;
-    console.log('[awards] BOOT — building timeline');
     // Re-kill any STs the global system may have created after our init
     ScrollTrigger.getAll().forEach(function (st) {
       if (!st.trigger) return;
