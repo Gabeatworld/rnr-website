@@ -9,7 +9,7 @@
   'use strict';
 
   const RNR = (window.RNR = window.RNR || {});
-  RNR.version = '386e154';
+  RNR.version = '8a809b2';
 
   // ── Module registry ──────────────────────────────────────
   const _modules = [];
@@ -949,6 +949,7 @@ RNR.register('awardsFooterPin', function (/* shared */) {
     var target = (numFromAttr > 0 ? numFromAttr : parseFloat(rawText.replace(/[^0-9.]/g, ''))) || 0;
     var suffix = rawText.replace(/^[\d,.\s]+/, '');
     el.removeAttribute('data-countup');
+    console.log('[awards] countup — attr:', attrVal, 'text:', rawText, 'target:', target);
     return { el: el, target: target, val: 0, suffix: suffix };
   });
 
@@ -1100,6 +1101,10 @@ RNR.register('awardsFooterPin', function (/* shared */) {
         invalidateOnRefresh: true,
         onUpdate: function (self) {
           var p = self.progress;
+          if (!self._logged05 && p > 0.05) { self._logged05 = true; console.log('[awards] progress 5%'); }
+          if (!self._logged20 && p > 0.20) { self._logged20 = true; console.log('[awards] progress 20%'); }
+          if (!self._logged40 && p > 0.40) { self._logged40 = true; console.log('[awards] progress 40%'); }
+          if (!self._logged60 && p > 0.60) { self._logged60 = true; console.log('[awards] progress 60%'); }
           if (p >= 0.24 && !spinStarted) {
             startSpin();
           } else if (p < 0.22 && spinStarted) {
@@ -1210,6 +1215,7 @@ RNR.register('awardsFooterPin', function (/* shared */) {
   var boot = function () {
     if (booted || !imagesReady || !introReady) return;
     booted = true;
+    console.log('[awards] BOOT — building timeline');
     // Re-kill any STs the global system may have created after our init
     ScrollTrigger.getAll().forEach(function (st) {
       if (!st.trigger) return;
